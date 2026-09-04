@@ -92,6 +92,8 @@ export class WorldScene extends Phaser.Scene {
     this.applyLayout();
     this.scale.on('resize', this.applyLayout, this);
     this.events.once('shutdown', () => {
+      // 🔴 ready 를 내리지 않으면 App 이 «죽은 씬»에 계속 그리기를 시킨다.
+      this.ready = false;
       this.scale.off('resize', this.applyLayout, this);
       this.stopAllMotion();
     });

@@ -44,7 +44,15 @@ function runBot({ p, seed, policy = 'know', mu = MU, sd = SD }) {
   const posHistory = [];
   let guard = 0;
 
+  // 🔴 연타봇은 «국면과 무관하게» 계속 누른다 — 그래야 입력 버퍼 경로를 실제로 밟는다.
+  //    문항 국면에서만 누르면 버퍼를 한 번도 안 지나가고 게이트가 초록으로 거짓말한다(실측으로 걸림).
+  let mashNext = 0;
   while (core.phase !== PHASE.OVER && core.t < MAX_MS && guard++ < 400000) {
+    if (policy === 'mash') {
+      if (core.t >= mashNext) { core.input(0); mashNext = core.t + 120; }
+      core.advance(STEP);
+      continue;
+    }
     if (core.phase === PHASE.QUESTION && !core.answered && !pending) {
       const q = core.question;
       const k = q.choices.length;

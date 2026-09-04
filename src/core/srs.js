@@ -72,11 +72,16 @@ export class PersistentNotes {
     return { box, max: SRS.MAX_BOX, graduated: box >= SRS.MAX_BOX };
   }
 
+  /**
+   * 정답 → 박스 진급. 🔴 «이미 틀린 적 있는» 항목만 진급시킨다.
+   * 처음 본 문항을 맞혔다고 오답노트에 넣으면, 한 번도 안 틀린 문제로 노트가 가득 찬다.
+   * @returns {'graduated'|'advanced'|null} null = 오답노트에 없던 항목(아무 일도 안 함)
+   */
   onCorrect(id, nowTs) {
-    const cur = this.data[id] || { box: 0, due: dayKey(nowTs) };
+    const cur = this.data[id];
+    if (!cur) return null;
     cur.box = Math.min(SRS.MAX_BOX, cur.box + 1);
-    cur.due = dayKey(nowTs + daysMs(SRS.BOX_DAYS[Math.min(cur.box, SRS.BOX_DAYS.length) - 1] || 1));
-    this.data[id] = cur;
+    cur.due = dayKey(nowTs + daysMs(SRS.BOX_DAYS[cur.box - 1]));
     return cur.box >= SRS.MAX_BOX ? 'graduated' : 'advanced';
   }
 

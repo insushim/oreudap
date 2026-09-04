@@ -48,7 +48,6 @@ export class GameCore {
     this.answered = false;
     this.resolveUntil = 0;
     this.pendingOver = false;
-    this._buffered = null;
     this.lastResult = null;
 
     this.stats = {
@@ -78,17 +77,14 @@ export class GameCore {
   }
 
   /**
-   * 입력. 문항이 살아 있으면 즉시 판정, 아니면 버퍼에 둔다.
-   * 버퍼는 «다음 문항 활성화 시각 − INPUT_BUFFER_MS» 안일 때만 소비된다.
+   * 입력. 문항이 «지금 살아 있을 때»만 판정한다.
+   * 🔴 버퍼링하지 않는다 — 선택지는 활성화 순간에 처음 보이므로, 그 전의 입력은
+   *    «보지 않은 문제에 대한 답»이 된다. 해결 국면·타임아웃 이후 입력도 같은 이유로 무시한다.
    * @returns {{type:string}}
    */
   input(choiceIndex) {
-    if (this.phase === PHASE.OVER || this.phase === PHASE.IDLE) return { type: 'ignored' };
-    if (this.phase === PHASE.QUESTION && !this.answered) {
-      return this._judge(choiceIndex);
-    }
-    this._buffered = { choiceIndex, t: this.t };
-    return { type: 'buffered' };
+    if (this.phase !== PHASE.QUESTION || this.answered) return { type: 'ignored' };
+    return this._judge(choiceIndex);
   }
 
   /** 시간을 dt(ms) 만큼 흘린다. 발생한 이벤트 배열을 돌려준다. */
@@ -110,7 +106,10 @@ export class GameCore {
       if (this.phase === PHASE.RESOLVE && this.t >= this.resolveUntil) {
         if (this.pendingOver) {
           this.phase = PHASE.OVER;
-          events.push({ type: 'gameover', floor: this.floor, stats: this.stats });
+          events.push({
+            type: 'gameover', floor: this.floor, stats: this.stats,
+            bestStreak: this.bestStreak, coins: this.coins,
+          });
           break;
         }
         events.push(...this._nextQuestion());
@@ -131,15 +130,6 @@ export class GameCore {
     this.phase = PHASE.QUESTION;
     this.stats.asked += 1;
     events.push({ type: 'question', question: this.question, branches, timerMs: this.timerMs });
-
-    // 버퍼된 입력은 «활성화 직전 130ms» 안의 것만 살린다.
-    if (this._buffered) {
-      const b = this._buffered;
-      this._buffered = null;
-      if (this.activeAt - b.t <= TIMING.INPUT_BUFFER_MS) {
-        events.push(this._judge(b.choiceIndex));
-      }
-    }
     return events;
   }
 

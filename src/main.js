@@ -86,6 +86,12 @@ async function boot() {
           game.scene.start('World', sceneData());
           app.scene = world;
           app.sound.attach(world, Object.keys(manifest.audio || {}));
+          // 🔴 재시작하면 발판이 전부 숨겨진 상태다 — 지금 문항으로 다시 세우지 않으면
+          //    DOM 선택지와 월드 발판이 다음 문항까지 어긋난 채로 남는다.
+          setTimeout(() => {
+            const q = app.core && app.core.question;
+            if (q && world.ready) world.showRow(q.choices.length);
+          }, 40);
         }
         setTimeout(res, 70);
       }),

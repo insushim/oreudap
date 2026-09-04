@@ -144,6 +144,45 @@ async function main() {
   if (toTrials < MIN_N) FAIL(`타임아웃 이후 입력 표본 ${toTrials} < ${MIN_N} — 측정 무효`);
   if (extraJudgements > 0) FAIL(`타임아웃 이후 입력이 ${extraJudgements}건 추가 판정됐다 — 무시돼야 한다`);
 
+  // ── D13-b2: 키를 «누르고 있어도» 다음 문항이 자동 판정되지 않는다 ──
+  await startRun(0);
+  {
+    await waitQuestion();
+    const before = await state();
+    await page.keyboard.down('ArrowLeft');       // 손을 떼지 않는다 → keydown 자동 반복
+    await page.waitForTimeout(3000);             // 문항 2~3개를 넘길 시간
+    await page.keyboard.up('ArrowLeft');
+    const log = await page.evaluate(() => window.__SMOKE__.app.qaLog.filter((r) => r.source === 'key'));
+    const judged = log.filter((r) => r.type === 'correct' || r.type === 'wrong').length;
+    NOTE(`키 홀드 3초 · 판정된 입력 ${judged}건 (기록 ${log.length}건)`);
+    if (judged > 1) FAIL(`키를 누르고 있는 동안 ${judged}건이 판정됐다 — 자동 반복이 다음 문항을 대신 푼다`);
+    const after = await state();
+    if (before.hearts - after.hearts > 1 && judged <= 1) {
+      NOTE('하트 감소는 시간초과분이다(자동 반복 판정 아님)');
+    }
+  }
+
+  // ── 오답노트는 «틀린» 문제만 담는다 ─────────────────────
+  await startRun(0);
+  {
+    // 🔴 오답노트는 판을 넘어 «영속»이다 — 절대 개수를 재면 이전 판의 오답까지 세게 된다.
+    //    이 판(전부 정답)에서 «늘어나지 않는가»를 재야 한다.
+    const before = await page.evaluate(() => window.__SMOKE__.app.notes.list().length);
+    for (let i = 0; i < 8; i++) {
+      try { await waitQuestion(); } catch { break; }
+      const s = await state();
+      if (s.phase !== 'question') break;
+      await page.waitForTimeout(250);
+      const still = await state();
+      if (still.phase !== 'question' || still.answered) continue;
+      await page.evaluate((idx) => window.__SMOKE__.app.press(idx, 'pointer'), still.ans);
+      await page.waitForTimeout(80);
+    }
+    const after = await page.evaluate(() => window.__SMOKE__.app.notes.list().length);
+    NOTE(`전부 정답 8문항 · 오답노트 ${before}행 → ${after}행`);
+    if (after > before) FAIL(`한 번도 안 틀렸는데 오답노트가 ${after - before}행 늘었다`);
+  }
+
   // ── D13-c: 진짜 포인터 탭 — 좌표 변환까지 검증 ──────────
   await startRun(0);
   let tapTrials = 0;

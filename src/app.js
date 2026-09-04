@@ -79,7 +79,7 @@ export class App {
     }
     $('#btn-pause').addEventListener('click', () => this.pause());
     $('#btn-resume').addEventListener('click', () => this.resume());
-    $('#btn-quit').addEventListener('click', () => { this.endRun(true); this.go('title'); });
+    $('#btn-quit').addEventListener('click', () => { this.quitRun(); });
     $('#btn-again').addEventListener('click', () => this.startRun());
     $('#scope-start').addEventListener('click', () => this.startRun());
   }
@@ -164,6 +164,11 @@ export class App {
   startRun() {
     this.endRun(true);
     const seed = this.seedFn();
+    // 스모크 상태가 일반 런으로 새면 봇이 대신 플레이한다 — 진입할 때마다 명시적으로 끈다.
+    this.autoBot = null;
+    this.smokeMode = false;
+    this.smokeRun = 0;
+    this.settled = false;
     this.core = new GameCore({ seed, subject: this.subject, scope: this.scope, notes: this.notes });
     this.runStartCoins = this.data.coins;
     this.paused = false;
@@ -183,10 +188,22 @@ export class App {
   }
 
   endRun(silent) {
-    if (this.scene) this.scene.stopAllMotion();
+    if (this.scene) {
+      this.scene.finished = true;      // 예약된 트윈·이펙트가 결과 화면을 덮지 않게 한다
+      this.scene.stopAllMotion();
+    }
     this.sound.stopBgm();
     if (!silent && this.core) this.showResult();
     this.clearChoices();
+  }
+
+  /** 중간에 그만두기 — 이번 판에서 번 것은 «잃지 않고» 정산한다 */
+  quitRun() {
+    this.paused = false;
+    $('#overlay-pause').hidden = true;
+    if (this.core && !this.settled) this.showResult();
+    else this.endRun(true);
+    this.go('title');
   }
 
   pause() {
@@ -208,6 +225,8 @@ export class App {
     if (this.screen !== 'play' || !this.core) return;
     if (e.key === 'Escape') { this.paused ? this.resume() : this.pause(); return; }
     if (this.paused) return;
+    // 🔴 키를 누르고 있으면 keydown 이 자동 반복된다 — 막지 않으면 손을 안 떼도 다음 문항이 계속 풀린다.
+    if (e.repeat) { e.preventDefault(); return; }
     const k = this.core.question ? this.core.question.choices.length : 2;
     const map = k === 3
       ? { ArrowLeft: 0, a: 0, A: 0, ArrowUp: 1, w: 1, W: 1, ArrowRight: 2, d: 2, D: 2 }
@@ -350,6 +369,8 @@ export class App {
   // ── 결과 ────────────────────────────────────────────────
   showResult() {
     const c = this.core;
+    if (!c || this.settled) { this.go('result'); return; }   // 정산은 런당 정확히 1회
+    this.settled = true;
     const prevBest = this.data.best[this.subject] || 0;
     const isBest = c.floor > prevBest;
     this.data.best[this.subject] = Math.max(prevBest, c.floor);
@@ -532,7 +553,9 @@ export class App {
   // ── 구동 루프 ───────────────────────────────────────────
   loop(now) {
     this.rafId = requestAnimationFrame(this.loop);
-    const dt = Math.min(now - this.lastFrame, 50); // 숨은 탭 복귀의 거대 delta 는 여기서 막는다
+    // 숨은 탭은 visibilitychange 에서 이미 일시정지된다. 여기 클램프는 «병적인 정지»만 막는 상한이다.
+    // 🔴 너무 작게 자르면(예전 50ms) 실제 경과보다 게임 시계가 느려져 «3.2초보다 오래» 답할 수 있다.
+    const dt = Math.min(now - this.lastFrame, 250);
     this.lastFrame = now;
     if (this.screen !== 'play' || !this.core || this.paused) return;
     this.step(dt);

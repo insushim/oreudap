@@ -7,14 +7,26 @@ import { dayKey } from './srs.js';
 
 export function todayMissions(saveData, nowTs) {
   const key = dayKey(nowTs);
+  // 🔴 기기 시계를 어제로 되돌려 같은 보상을 다시 받는 경로를 막는다 —
+  //    «본 적 있는 가장 나중 날짜»보다 이른 날짜로는 초기화하지 않는다.
+  const seen = saveData.missions.maxDay || saveData.missions.day || '';
+  if (key < seen) return snapshotMissions(saveData);
   if (saveData.missions.day !== key) {
-    saveData.missions = { day: key, progress: {}, claimed: [] };
+    saveData.missions = { day: key, maxDay: key, progress: {}, claimed: [] };
+  } else if (saveData.missions.maxDay !== key) {
+    saveData.missions.maxDay = key;
   }
+  return snapshotMissions(saveData);
+}
+
+function snapshotMissions(saveData) {
+  const progress = saveData.missions.progress || {};
+  const claimed = Array.isArray(saveData.missions.claimed) ? saveData.missions.claimed : [];
   return MISSIONS.map((m) => ({
     ...m,
-    done: (saveData.missions.progress[m.id] || 0) >= m.goal,
-    claimed: saveData.missions.claimed.includes(m.id),
-    value: Math.min(m.goal, saveData.missions.progress[m.id] || 0),
+    done: (progress[m.id] || 0) >= m.goal,
+    claimed: claimed.includes(m.id),
+    value: Math.min(m.goal, progress[m.id] || 0),
   }));
 }
 
@@ -44,14 +56,17 @@ export function applyRun(saveData, run, nowTs) {
   return { gained, completed };
 }
 
+const KINDS = { skin: 'SKINS', theme: 'THEMES' };
+
 export function priceOf(kind, id) {
-  const list = kind === 'skin' ? SHOP.SKINS : SHOP.THEMES;
-  const found = list.find((x) => x.id === id);
+  if (!KINDS[kind]) return null;      // 알 수 없는 kind 가 theme 으로 취급되던 경로를 막는다
+  const found = SHOP[KINDS[kind]].find((x) => x.id === id);
   return found ? found.price : null;
 }
 
 /** @returns {{ok:boolean, reason?:string}} */
 export function buy(saveData, kind, id) {
+  if (!KINDS[kind]) return { ok: false, reason: 'unknown' };
   const price = priceOf(kind, id);
   if (price === null) return { ok: false, reason: 'unknown' };
   const owned = kind === 'skin' ? saveData.ownedSkins : saveData.ownedThemes;
@@ -63,6 +78,7 @@ export function buy(saveData, kind, id) {
 }
 
 export function equip(saveData, kind, id) {
+  if (!KINDS[kind]) return false;
   const owned = kind === 'skin' ? saveData.ownedSkins : saveData.ownedThemes;
   if (!owned.includes(id)) return false;
   if (kind === 'skin') saveData.skin = id; else saveData.theme = id;

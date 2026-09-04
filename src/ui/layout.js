@@ -7,7 +7,10 @@ export const MIN_TAP = 44;   // 접근성 최소 터치 타깃(px)
 export const CHOICE_MIN_H = 88;
 
 export function computeLayout(w, h) {
-  const contentW = Math.min(w - 24, MAX_CONTENT_W);
+  // 🔴 아주 좁은 뷰포트에서 열 너비가 44px 밑으로 내려가면 «선언한 최소 터치 크기»가 깨진다.
+  //    화면을 넘더라도 최소 폭을 지킨다(스크롤이 생기는 편이 못 누르는 것보다 낫다).
+  const MIN_CONTENT = MIN_TAP * 3 + 24;
+  const contentW = Math.max(MIN_CONTENT, Math.min(w - 24, MAX_CONTENT_W));
   const contentLeft = (w - contentW) / 2;
   const landscape = w > h;
   // 가로 화면에서는 카드/발판 밴드를 위로 당겨 하단 여백을 확보한다.

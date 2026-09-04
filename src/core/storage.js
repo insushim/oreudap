@@ -2,7 +2,9 @@
 // 🔴 개인정보는 저장하지 않는다. 저장하는 것: 코인·해금·최고기록·오답노트 박스·미션 진행뿐.
 // localStorage 접근은 전부 try/catch — 사생활 보호 모드·차단 설정에서 접근 자체가 throw 한다.
 
-import { SAVE, SHOP } from './balance.js';
+import { SAVE, SHOP, SRS } from './balance.js';
+
+const SRS_MAX_BOX = SRS.MAX_BOX;
 
 export function emptySave() {
   return {
@@ -13,7 +15,7 @@ export function emptySave() {
     ownedThemes: ['dawn'],
     best: {},          // subject -> 최고 층
     notes: {},         // 영속 오답노트 박스
-    missions: { day: '', progress: {}, claimed: [] },
+    missions: { day: '', maxDay: '', progress: {}, claimed: [] },
     totals: { runs: 0, correct: 0, asked: 0 },
     settings: { sound: true, reducedMotion: false, colorSafe: false },
   };
@@ -31,6 +33,8 @@ const MIGRATIONS = {
 };
 
 export function migrate(version, data) {
+  // 미래 버전·음수 버전은 «이 코드가 모르는 형식»이다 — 현행처럼 받아들이지 않는다.
+  if (!Number.isInteger(version) || version < 1 || version > SAVE.VERSION) return emptySave();
   let v = version;
   let d = data;
   while (v < SAVE.VERSION) {
@@ -42,22 +46,79 @@ export function migrate(version, data) {
   return d;
 }
 
-/** 저장 데이터 정합화 — 알 수 없는 id·음수 코인을 정리한다 */
+const MAX_COINS = 9_999_999;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 유한한 0 이상 정수로 강제. "Infinity"·NaN·문자열·객체를 전부 걸러 낸다. */
+function intOrZero(v, max = Number.MAX_SAFE_INTEGER) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(max, Math.max(0, Math.floor(n)));
+}
+
+function plainObject(v) {
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+
+/**
+ * 저장 데이터 정합화.
+ * 🔴 localStorage 는 신뢰 경계 «밖»이다 — 타입까지 강제해야 한다.
+ *    「배열인 줄 알았는데 객체」 하나가 includes/spread 에서 TypeError 를 내고,
+ *    load() 의 catch 가 코인·최고기록·오답노트를 통째로 날린다.
+ */
 export function sanitize(data) {
   const base = emptySave();
-  const out = { ...base, ...data };
-  out.coins = Math.max(0, Math.floor(Number(out.coins) || 0));
+  const out = { ...base, ...plainObject(data) };
+
+  out.coins = intOrZero(out.coins, MAX_COINS);
+
   const skinIds = SHOP.SKINS.map((s) => s.id);
   const themeIds = SHOP.THEMES.map((s) => s.id);
-  out.ownedSkins = Array.from(new Set(['fox', ...(out.ownedSkins || [])])).filter((id) => skinIds.includes(id));
-  out.ownedThemes = Array.from(new Set(['dawn', ...(out.ownedThemes || [])])).filter((id) => themeIds.includes(id));
+  const asIdList = (v, valid, fallback) => Array.from(new Set([
+    fallback,
+    ...(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []),
+  ])).filter((id) => valid.includes(id));
+  out.ownedSkins = asIdList(out.ownedSkins, skinIds, 'fox');
+  out.ownedThemes = asIdList(out.ownedThemes, themeIds, 'dawn');
   if (!out.ownedSkins.includes(out.skin)) out.skin = 'fox';
   if (!out.ownedThemes.includes(out.theme)) out.theme = 'dawn';
-  out.best = out.best && typeof out.best === 'object' ? out.best : {};
-  out.notes = out.notes && typeof out.notes === 'object' ? out.notes : {};
-  out.settings = { ...base.settings, ...(out.settings || {}) };
-  out.missions = { ...base.missions, ...(out.missions || {}) };
-  out.totals = { ...base.totals, ...(out.totals || {}) };
+
+  const best = plainObject(out.best);
+  out.best = {};
+  for (const [k, v] of Object.entries(best)) out.best[k] = intOrZero(v, 1_000_000);
+
+  const notes = plainObject(out.notes);
+  out.notes = {};
+  for (const [id, rec] of Object.entries(notes)) {
+    const r = plainObject(rec);
+    const box = Number(r.box);
+    if (!Number.isInteger(box) || box < 0 || box > SRS_MAX_BOX) continue;   // 손상 항목은 버린다
+    if (typeof r.due !== 'string' || !DAY_RE.test(r.due)) continue;
+    out.notes[id] = { box, due: r.due };
+  }
+
+  out.settings = { ...base.settings };
+  for (const k of Object.keys(base.settings)) {
+    const v = plainObject(data).settings ? plainObject(plainObject(data).settings)[k] : undefined;
+    if (typeof v === 'boolean') out.settings[k] = v;
+  }
+
+  const m = plainObject(out.missions);
+  const day = typeof m.day === 'string' && DAY_RE.test(m.day) ? m.day : '';
+  const maxDay = typeof m.maxDay === 'string' && DAY_RE.test(m.maxDay) ? m.maxDay : day;
+  const progress = {};
+  for (const [k, v] of Object.entries(plainObject(m.progress))) progress[k] = intOrZero(v, 1_000_000);
+  out.missions = {
+    day, maxDay, progress,
+    claimed: Array.isArray(m.claimed) ? m.claimed.filter((x) => typeof x === 'string') : [],
+  };
+
+  const t = plainObject(out.totals);
+  out.totals = {
+    runs: intOrZero(t.runs, 1_000_000),
+    correct: intOrZero(t.correct, 10_000_000),
+    asked: intOrZero(t.asked, 10_000_000),
+  };
   return out;
 }
 

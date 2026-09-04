@@ -98,14 +98,14 @@ describe('문항당 판정은 정확히 1회 [D3]', () => {
     expect(g.stats.wrong).toBe(0);
   });
 
-  it('해결 국면의 입력은 다음 문항을 자동으로 풀지 않는다(버퍼 창 밖)', () => {
+  it('해결 국면의 입력은 다음 문항을 자동으로 풀지 않는다', () => {
     const g = newGame();
     g.advance(50);
     g.input(g.question.answerIndex);           // 정답 → RESOLVE (220ms)
     g.input(0);                                // 해결 직후 입력 = 다음 활성화보다 220ms 이르다
     g.advance(TIMING.JUMP_MS + 1);
     expect(g.phase).toBe(PHASE.QUESTION);
-    expect(g.answered).toBe(false);            // 버퍼가 소비되지 않았다
+    expect(g.answered).toBe(false);            // 새 문항은 손대지 않은 채로 시작한다
     expect(g.stats.asked).toBe(2);
   });
 });
@@ -289,6 +289,7 @@ describe('SRS — 세션 큐와 영속 박스 [D11]', () => {
   it('박스 날짜가 BOX_DAYS 대로 밀린다', () => {
     const n = new PersistentNotes();
     const t = new Date('2026-09-04T09:00:00').getTime();
+    n.onWrong('g:3x3', t);                // 오답노트는 «틀린» 문제로만 시작한다
     n.onCorrect('g:3x3', t);              // box 1 → +1일
     expect(n.data['g:3x3'].due).toBe(dayKey(t + 1 * 86400000));
     n.onCorrect('g:3x3', t);              // box 2 → +3일
@@ -343,35 +344,121 @@ describe('세이브 [D12]', () => {
   });
 });
 
-describe('입력 버퍼 [D13]', () => {
-  it('활성화 직전 130ms 안의 입력은 버퍼돼 1회 판정된다', () => {
+describe('입력은 문항이 살아 있을 때만 판정된다 [D13]', () => {
+  it('활성화 «이전» 입력은 버려진다 — 보지 않은 문제에 답이 커밋되지 않는다', () => {
     const g = newGame();
     g.advance(50);
-    g.input(g.question.answerIndex);             // 정답 → RESOLVE 220ms
-    g.advance(TIMING.JUMP_MS - 100);             // 다음 활성화 100ms 전
-    const buffered = g.input(0);
-    expect(buffered.type).toBe('buffered');
-    g.advance(101);
-    expect(g.answered).toBe(true);               // 활성화 직후 소비됐다
+    g.input(g.question.answerIndex);             // 정답 → RESOLVE
+    const res = g.input(0);                      // 해결 국면 입력
+    expect(res.type).toBe('ignored');
+    g.advance(TIMING.JUMP_MS + 1);
+    expect(g.answered).toBe(false);              // 새 문항은 손대지 않은 채로 시작한다
     expect(g.stats.asked).toBe(2);
   });
-  it('버퍼 창(130ms) 밖의 입력은 버려진다', () => {
+
+  it('해결 국면 «막바지» 입력도 버려진다(옛 130ms 버퍼 창)', () => {
     const g = newGame();
     g.advance(50);
     g.input(g.question.answerIndex);
-    const buffered = g.input(0);                 // RESOLVE 시작 = 활성화 220ms 전
-    expect(buffered.type).toBe('buffered');
-    g.advance(TIMING.JUMP_MS + 1);
+    g.advance(TIMING.JUMP_MS - 100);             // 다음 활성화 100ms 전
+    expect(g.input(0).type).toBe('ignored');
+    g.advance(101);
     expect(g.answered).toBe(false);
   });
+
+  it('연타해도 다음 문항이 자동 판정되지 않는다', () => {
+    const g = newGame();
+    g.advance(50);
+    const startFloor = g.floor;
+    for (let i = 0; i < 40; i++) { g.input(0); g.advance(30); }
+    // 40번 눌렀지만 «각 문항이 살아 있는 동안»의 입력만 판정됐다
+    expect(g.stats.asked).toBe(g.stats.correct + g.stats.wrong);
+    expect(g.floor - startFloor).toBe(g.stats.correct);
+  });
+
   it('타임아웃 이후의 입력은 무시된다 — 하트는 타임아웃분 1만 깎인다', () => {
     const g = newGame();
-    g.advance(g.timerMs + 1);                    // 타임아웃
+    g.advance(g.timerMs + 1);
     expect(g.hearts).toBe(2);
-    g.input(0);                                  // 타임아웃 직후
+    expect(g.input(0).type).toBe('ignored');
     g.advance(TIMING.STUMBLE_MS + TIMING.HIGHLIGHT_MS + 1);
     expect(g.hearts).toBe(2);
     expect(g.answered).toBe(false);
+  });
+});
+
+describe('손상·조작된 저장값 정합화', () => {
+  it('"Infinity" 코인이 그대로 통과하지 않는다', () => {
+    expect(sanitize({ coins: 'Infinity' }).coins).toBe(0);
+    expect(sanitize({ coins: NaN }).coins).toBe(0);
+    expect(sanitize({ coins: 1e30 }).coins).toBeLessThanOrEqual(9999999);
+  });
+  it('배열이어야 할 값이 객체여도 터지지 않는다', () => {
+    const s = sanitize({ ownedSkins: { 0: 'dragon' }, missions: { claimed: { a: 1 } } });
+    expect(s.ownedSkins).toEqual(['fox']);
+    expect(Array.isArray(s.missions.claimed)).toBe(true);
+    expect(() => todayMissions(s, NOW())).not.toThrow();
+  });
+  it('손상된 오답노트 항목은 버려진다(NaN 가중치 차단)', () => {
+    const s = sanitize({ notes: { 'g:7x8': { box: 'x', due: '0000-00-00' }, 'g:2x2': { box: 2, due: '2026-09-04' } } });
+    expect(s.notes['g:7x8']).toBeUndefined();
+    expect(s.notes['g:2x2']).toEqual({ box: 2, due: '2026-09-04' });
+    const n = new PersistentNotes(s.notes);
+    expect(Number.isFinite(n.weight('g:2x2', NOW()))).toBe(true);
+  });
+  it('모르는 저장 버전은 받아들이지 않는다', () => {
+    expect(migrate(999, { coins: 99999 }).coins).toBe(0);
+    expect(migrate(0, { coins: 99999 }).coins).toBe(0);
+  });
+  it('최고 기록·누적값도 수치로 강제된다', () => {
+    const s = sanitize({ best: { gugudan: '-5', words34: 'abc' }, totals: { runs: 'x' } });
+    expect(s.best.gugudan).toBe(0);
+    expect(s.best.words34).toBe(0);
+    expect(s.totals.runs).toBe(0);
+  });
+});
+
+describe('오답노트는 «틀린» 문제만 담는다', () => {
+  it('처음 본 문항을 맞혀도 노트에 생기지 않는다', () => {
+    const n = new PersistentNotes();
+    expect(n.onCorrect('g:3x3', NOW())).toBe(null);
+    expect(n.list()).toEqual([]);
+  });
+  it('틀린 뒤에는 진급한다', () => {
+    const n = new PersistentNotes();
+    n.onWrong('g:3x3', NOW());
+    expect(n.onCorrect('g:3x3', NOW())).toBe('advanced');
+    expect(n.box('g:3x3')).toBe(1);
+  });
+  it('한 판을 다 맞혀도 오답노트가 비어 있다', () => {
+    const g = newGame();
+    for (let i = 0; i < 20; i++) answerCorrect(g);
+    expect(g.notes.list()).toEqual([]);
+  });
+});
+
+describe('상점 kind 검증', () => {
+  it('알 수 없는 kind 는 theme 으로 취급되지 않는다', () => {
+    const s = emptySave();
+    s.coins = 5000;
+    expect(buy(s, 'bogus', 'night')).toEqual({ ok: false, reason: 'unknown' });
+    expect(s.ownedThemes).toEqual(['dawn']);
+    expect(equip(s, 'bogus', 'night')).toBe(false);
+  });
+});
+
+describe('일일 미션 날짜 되돌리기 방지', () => {
+  it('기기 시계를 어제로 돌려도 미션이 다시 초기화되지 않는다', () => {
+    const s = emptySave();
+    const today = NOW();
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, today);
+    expect(s.coins).toBe(60);
+    const yesterday = today - 86400000;
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, yesterday);
+    expect(s.coins).toBe(60);            // 어제로 되돌려도 재지급 없음
+    const tomorrow = today + 86400000;
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, tomorrow);
+    expect(s.coins).toBe(120);           // 진짜 다음 날은 정상 지급
   });
 });
 

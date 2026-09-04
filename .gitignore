@@ -4,3 +4,4 @@ qa/shots/
 qa/answer-sample.json
 tools/*.log
 .DS_Store
+.vercel

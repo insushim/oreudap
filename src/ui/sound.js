@@ -20,10 +20,14 @@ export class Sound {
   }
 
   attach(scene, keys) {
+    // 🔴 참조만 버리면 «전역 사운드 매니저에서 계속 울리는» BGM 이 남아 중첩된다.
+    //    먼저 멈추고 파괴한 뒤에 참조를 버린다.
+    try {
+      if (this.bgm) { this.bgm.stop(); this.bgm.destroy(); }
+    } catch { /* 이미 파괴됨 */ }
+    this.bgm = null;
     this.scene = scene;
     if (keys) this.keys = keys;
-    // 씬이 다시 서면 이전 Sound 객체는 파괴돼 있다 — 참조를 버리지 않으면 재생이 조용히 죽는다.
-    this.bgm = null;
     this.unlocked = false;
   }
 
