@@ -11,11 +11,22 @@ run() {
   echo "▶ $name"
   if "$@"; then
     echo "  ✅ $name"
-  else
-    local rc=$?
-    echo "  ❌ $name (rc=$rc)"
-    FAILED+=("$name(rc=$rc)")
+    return
   fi
+  local rc=$?
+  # 🔴 rc=3 은 «도구가 죽었다» = 미실행이지 실패가 아니다. 브라우저가 호스트 부하로 떨어지는
+  #    일이 실제로 있었다(2026-09-04: 시각 QA 가 rc=3, 단독 재실행은 통과). 미실행은 한 번 다시 잰다.
+  #    🚫 rc=1(진짜 실패)은 절대 재시도하지 않는다 — 재시도로 빨간불을 지우면 게이트가 아니다.
+  if [[ $rc -eq 3 ]]; then
+    echo "  ⚠️  $name 미실행(rc=3) — 한 번 다시 잰다"
+    if "$@"; then
+      echo "  ✅ $name (재실행)"
+      return
+    fi
+    rc=$?
+  fi
+  echo "  ❌ $name (rc=$rc)"
+  FAILED+=("$name(rc=$rc)")
 }
 
 run "유닛 테스트 (D2~D13·D27·D29)"    npx vitest run --reporter=dot

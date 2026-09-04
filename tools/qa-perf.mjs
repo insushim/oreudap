@@ -94,7 +94,10 @@ async function main() {
   }
 
   // ── ② 최악 장면 P95 ────────────────────────────────────
-  const perf = await page.evaluate(async (frames) => {
+  // 🔴 한 번만 재면 안 된다 — 호스트 부하가 섞여 «코드를 안 바꿨는데» 32~66ms 사이를 오간다.
+  //    노이즈는 시간을 «더하기만» 하므로, 여러 번 재서 **가장 빠른 회차**가 코드의 실제 비용에
+  //    가장 가깝다(벤치마킹 표준). 판정은 그 값으로 하고, 흔들림 폭은 로그에 남겨 눈으로 본다.
+  const measure = () => page.evaluate(async (frames) => {
     const app = window.__SMOKE__.app;
     const world = app.scene;
     // 🔴 최악 장면을 «만든다» — 층 전환 + 3갈래 등장 + 파티클 + 하늘 전환 + HUD 갱신 동시.
@@ -146,10 +149,18 @@ async function main() {
     return { worstScene, frames: marks.length, p50: p(0.5), p95: p(0.95), max: marks[marks.length - 1], maxDraw, glInstrumented: !!restore };
   }, FRAMES);
 
+  const runs = [];
+  for (let i = 0; i < 3; i++) runs.push(await measure());
+  const perf = runs.reduce((a, b) => (b.p95 < a.p95 ? b : a));
+  // 🔴 드로우콜은 «최악»을 봐야 한다 — 시간과 달리 노이즈가 아니라 구조라서, 최속 회차만 보면
+  //    다른 회차에서 튄 값을 놓친다. 시간은 최속, 개수는 최대 — 축이 다르면 집계도 달라야 한다.
+  perf.maxDraw = Math.max(...runs.map((r) => r.maxDraw));
+  const spread = `${Math.min(...runs.map((r) => r.p95)).toFixed(1)}~${Math.max(...runs.map((r) => r.p95)).toFixed(1)}ms`;
+
   // 「최악 장면에서 쟀다」를 먼저 단언한다
   if (!perf.worstScene) FAIL('최악 장면 플래그가 안 찍혔다 — 조용한 장면을 잰 것이다(측정 무효)');
   if (perf.frames < FRAMES * 0.9) FAIL(`프레임 표본 ${perf.frames} < ${Math.floor(FRAMES * 0.9)} — 측정 무효`);
-  NOTE(`최악 장면 worst-scene=true · 프레임 ${perf.frames} · P50 ${perf.p50.toFixed(1)}ms · P95 ${perf.p95.toFixed(1)}ms · 최대 ${perf.max.toFixed(1)}ms`);
+  NOTE(`최악 장면 worst-scene=true · 프레임 ${perf.frames} · P50 ${perf.p50.toFixed(1)}ms · P95 ${perf.p95.toFixed(1)}ms(3회 중 최속, 관측 폭 ${spread}) · 최대 ${perf.max.toFixed(1)}ms`);
   NOTE(`드로우콜(GL draw 호출) 프레임 최대 ${perf.maxDraw}`);
   // 「0 이라서 통과」를 막는다 — 계측이 안 붙었으면 그건 검사 0건이지 통과가 아니다.
   if (!perf.glInstrumented) FAIL('GL 드로우 계측을 붙이지 못했다 — 드로우콜 검사 미실행(측정 무효)');
@@ -169,6 +180,13 @@ async function main() {
   console.log('\n── 성능·번들 게이트 (D25) ───────────────────────');
   for (const n of notes) console.log('  · ' + n);
   console.log('  ⚠️ headless 프레임 시간은 실기기 성능이 아니다 — 최종 P95 는 참조 기기에서 다시 잰다(GDD §1-9).');
+  // 🔴 P95 를 «실행 간 비교»에 쓰지 마라. 2026-09-04 실측: 코드를 한 줄도 안 바꾸고 같은 커밋을
+  //    반복 측정했더니 32.3 / 43.7 / 48.8ms 였고, 예전 로그의 17.8ms 도 같은 코드였다.
+  //    이 값은 호스트 부하를 재는 것에 가깝다 — 회귀로 읽으면 없는 버그를 쫓게 된다(실제로 쫓았다).
+  //    그래서 3회 재서 최속 회차로 판정한다. 한 번만 재던 시절엔 66.1ms 가 나와 한계선 68ms 를
+  //    스칠 뻔했다 — 무작위로 빨간불이 켜지는 게이트는 사람이 게이트를 안 믿게 만든다.
+  //    실행 간 비교가 가능한 것은 P50(16.7ms 로 안정)과 드로우콜뿐이다.
+  console.log('  ⚠️ P95 절대값은 호스트 부하를 같이 잰다 — 실행 간 비교 금지. 비교는 P50·드로우콜로.');
   if (fails.length) {
     console.log('\n❌ 성능·번들 게이트 FAIL');
     for (const f of fails) console.log('  ✖ ' + f);
