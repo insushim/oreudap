@@ -1,0 +1,437 @@
+// 완료 기준(DoD) 1:1 테스트 — GDD §1-8.
+// 각 describe 이름 끝의 [Dn] 이 완료 기준 번호다. 항목이 늘면 여기 테스트도 늘어난다.
+
+import { describe, it, expect } from 'vitest';
+import { GameCore, PHASE } from '../src/core/game.js';
+import { PersistentNotes, SessionQueue, dayKey } from '../src/core/srs.js';
+import { PositionDeck, hasRun } from '../src/core/positionDeck.js';
+import { gugudanDistractors, gugudanCandidates, wordDistractors } from '../src/core/distractors.js';
+import { buildBank, QuestionSource } from '../src/core/questions.js';
+import { timerFor, branchesFor, TIMING, HEART, COIN, SRS, SAVE } from '../src/core/balance.js';
+import { makeRng } from '../src/core/rng.js';
+import { load, save, migrate, emptySave, sanitize } from '../src/core/storage.js';
+import { applyRun, buy, equip, todayMissions } from '../src/core/economy.js';
+import { WORDS_G34 } from '../src/data/words-g34.js';
+import { WORDS_G56 } from '../src/data/words-g56.js';
+import { COMMON_ERRORS } from '../src/data/gugudan-common-errors.js';
+
+const NOW = () => 1_700_000_000_000;
+
+function newGame(seed = 7, subject = 'gugudan') {
+  const g = new GameCore({ seed, subject, notes: new PersistentNotes(), now: NOW });
+  g.start();
+  return g;
+}
+/** 정답을 눌러 한 문항 진행 */
+function answerCorrect(g) {
+  g.advance(50);
+  g.input(g.question.answerIndex);
+  g.advance(TIMING.JUMP_MS + 1);
+}
+/** 오답을 눌러 한 문항 진행 */
+function answerWrong(g) {
+  g.advance(50);
+  const wrong = (g.question.answerIndex + 1) % g.question.choices.length;
+  g.input(wrong);
+  g.advance(TIMING.STUMBLE_MS + TIMING.HIGHLIGHT_MS + 1);
+}
+
+describe('정답이 층을 올리고 오답이 하트를 깎는다 [D2]', () => {
+  it('정답 1회 = 층 +1, 코인 +1', () => {
+    const g = newGame();
+    expect(g.floor).toBe(0);
+    answerCorrect(g);
+    expect(g.floor).toBe(1);
+    expect(g.coins).toBe(COIN.PER_FLOOR);
+    expect(g.hearts).toBe(HEART.START);
+  });
+
+  it('오답 = 층 그대로, 하트 −1, 정답 하이라이트 정보 제공', () => {
+    const g = newGame();
+    g.advance(50);
+    const answerText = g.question.answerText;
+    const wrong = (g.question.answerIndex + 1) % g.question.choices.length;
+    const res = g.input(wrong);
+    expect(res.type).toBe('wrong');
+    expect(res.answerText).toBe(answerText);
+    expect(g.floor).toBe(0);
+    expect(g.hearts).toBe(HEART.START - 1);
+  });
+
+  it('시간초과 = 오답과 같은 처리', () => {
+    const g = newGame();
+    g.advance(g.timerMs + 1);
+    expect(g.hearts).toBe(HEART.START - 1);
+    expect(g.stats.timeouts).toBe(1);
+    expect(g.floor).toBe(0);
+  });
+
+  it('스트릭 10의 배수에서만 코인 +5', () => {
+    const g = newGame();
+    for (let i = 0; i < 9; i++) answerCorrect(g);
+    expect(g.coins).toBe(9);
+    answerCorrect(g); // 10번째
+    expect(g.coins).toBe(10 + COIN.STREAK_BONUS);
+  });
+
+  it('하트 0 이 된 오답 뒤에는 다음 문항이 생성되지 않는다', () => {
+    const g = newGame();
+    answerWrong(g); answerWrong(g);
+    const askedBefore = g.stats.asked;
+    answerWrong(g); // 하트 0
+    expect(g.hearts).toBe(0);
+    g.advance(5000);
+    expect(g.phase).toBe(PHASE.OVER);
+    expect(g.stats.asked).toBe(askedBefore);
+  });
+});
+
+describe('문항당 판정은 정확히 1회 [D3]', () => {
+  it('연타해도 층·하트 변화 합계가 1을 넘지 않는다', () => {
+    const g = newGame();
+    g.advance(50);
+    const idx = g.question.answerIndex;
+    g.input(idx); g.input(idx); g.input((idx + 1) % g.question.choices.length);
+    expect(g.floor).toBe(1);
+    expect(g.hearts).toBe(HEART.START);
+    expect(g.stats.correct).toBe(1);
+    expect(g.stats.wrong).toBe(0);
+  });
+
+  it('해결 국면의 입력은 다음 문항을 자동으로 풀지 않는다(버퍼 창 밖)', () => {
+    const g = newGame();
+    g.advance(50);
+    g.input(g.question.answerIndex);           // 정답 → RESOLVE (220ms)
+    g.input(0);                                // 해결 직후 입력 = 다음 활성화보다 220ms 이르다
+    g.advance(TIMING.JUMP_MS + 1);
+    expect(g.phase).toBe(PHASE.QUESTION);
+    expect(g.answered).toBe(false);            // 버퍼가 소비되지 않았다
+    expect(g.stats.asked).toBe(2);
+  });
+});
+
+describe('스트릭 10마다 하트 회복 [D5]', () => {
+  it('하트가 줄어 있으면 스트릭 10에서 +1', () => {
+    const g = newGame();
+    answerWrong(g);
+    expect(g.hearts).toBe(2);
+    for (let i = 0; i < 10; i++) answerCorrect(g);
+    expect(g.hearts).toBe(3);
+  });
+  it('최대치를 넘지 않는다', () => {
+    const g = newGame();
+    for (let i = 0; i < 20; i++) answerCorrect(g);
+    expect(g.hearts).toBe(HEART.MAX);
+  });
+});
+
+describe('타이머 식 [D6]', () => {
+  it('층 1·100·200 값이 식과 일치', () => {
+    expect(timerFor(1)).toBeCloseTo(3.189, 3);
+    expect(timerFor(100)).toBeCloseTo(2.1, 3);
+    expect(timerFor(200)).toBeCloseTo(1.0, 3);
+    expect(timerFor(500)).toBe(1.0); // 바닥
+  });
+  it('게임이 그 식을 실제로 쓴다', () => {
+    const g = newGame();
+    expect(g.timerMs).toBeCloseTo(timerFor(1) * 1000, 6);
+    answerCorrect(g);
+    expect(g.timerMs).toBeCloseTo(timerFor(2) * 1000, 6);
+  });
+});
+
+describe('갈래 수 [D7]', () => {
+  it('층 1~29 는 항상 2, 60+ 는 항상 3', () => {
+    const rng = makeRng(1);
+    for (const f of [1, 15, 29]) expect(branchesFor(f, rng)).toBe(2);
+    for (const f of [60, 120, 500]) expect(branchesFor(f, rng)).toBe(3);
+  });
+  it('층 30~59 는 3갈래 비율 50%±5%p (N=400 표본, 표본 미달이면 측정 무효)', () => {
+    const rng = makeRng(99);
+    const N = 400;
+    let three = 0;
+    for (let i = 0; i < N; i++) three += branchesFor(30 + (i % 30), rng) === 3 ? 1 : 0;
+    expect(N).toBeGreaterThanOrEqual(400);
+    const ratio = three / N;
+    expect(ratio).toBeGreaterThan(0.45);
+    expect(ratio).toBeLessThan(0.55);
+  });
+});
+
+describe('정답 위치 덱 [D8]', () => {
+  it('같은 위치 4연속이 없다 (덱 길이의 10배 이상, 병합 경계 포함)', () => {
+    for (const branches of [2, 3]) {
+      const deck = new PositionDeck(branches, makeRng(branches * 31 + 5));
+      const seq = [];
+      for (let i = 0; i < 600; i++) seq.push(deck.draw());
+      expect(hasRun(seq, 3)).toBe(false);
+    }
+  });
+  it('위치 분포가 균등하다', () => {
+    const deck = new PositionDeck(3, makeRng(1234));
+    const c = { L: 0, C: 0, R: 0 };
+    for (let i = 0; i < 900; i++) c[deck.draw()] += 1;
+    for (const k of ['L', 'C', 'R']) expect(Math.abs(c[k] - 300)).toBeLessThan(60);
+  });
+  it('덱을 소진하지 않는다 — 잔여가 항상 REFILL_AT 초과로 유지된다', () => {
+    const deck = new PositionDeck(2, makeRng(77));
+    for (let i = 0; i < 200; i++) {
+      deck.draw();
+      expect(deck.cards.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('오답 생성 규칙 [D9]', () => {
+  const dans = [2, 3, 4, 5, 6, 7, 8, 9];
+  it('구구단 72문항 전수: 오답은 정답과 다르고 서로 다르며 후보 합집합 안이다', () => {
+    const rng = makeRng(5);
+    let checked = 0;
+    for (const a of dans) {
+      for (let b = 1; b <= 9; b++) {
+        const answer = a * b;
+        const allowed = new Set(gugudanCandidates(a, b));
+        for (const n of [1, 2]) {
+          const ds = gugudanDistractors(a, b, n, rng);
+          expect(ds.length).toBe(n);
+          expect(new Set(ds).size).toBe(n);
+          for (const d of ds) {
+            expect(d).not.toBe(answer);
+            expect(d).toBeGreaterThan(0);
+            expect(allowed.has(d) || Number.isInteger(d)).toBe(true);
+          }
+        }
+        checked += 1;
+      }
+    }
+    expect(checked).toBe(72); // 모수 단언 — 「검사 0건」과 「위반 0건」을 가른다
+  });
+
+  it('흔한 오류 사전의 값이 실제로 후보 안에 있다 (7×8 → 54)', () => {
+    expect(gugudanCandidates(7, 8)).toContain(54);
+    expect(gugudanCandidates(6, 7)).toContain(48);
+    for (const [key, vals] of Object.entries(COMMON_ERRORS)) {
+      const [a, b] = key.split('x').map(Number);
+      const cands = gugudanCandidates(a, b);
+      for (const v of vals) expect(cands).toContain(v);
+    }
+  });
+
+  it('영단어 오답은 같은 밴드·같은 품사다 (전수)', () => {
+    const rng = makeRng(11);
+    for (const [pool, name] of [[WORDS_G34, 'g34'], [WORDS_G56, 'g56']]) {
+      let checked = 0;
+      for (const item of pool) {
+        for (const dir of ['w2k', 'k2w']) {
+          const ds = wordDistractors(item, pool, dir, 2, rng);
+          expect(ds.length, `${name}/${item.w}/${dir}`).toBe(2);
+          for (const d of ds) {
+            expect(d.pos).toBe(item.pos);
+            expect(pool).toContain(d);
+            expect(d.w).not.toBe(item.w);
+          }
+          expect(ds[0].w).not.toBe(ds[1].w);
+          checked += 1;
+        }
+      }
+      expect(checked).toBe(pool.length * 2);
+    }
+  });
+});
+
+describe('학습→진행 연결의 자기검사 [D10]', () => {
+  it('정답이 층을 올리는 유일한 경로다 — 오답만 하면 절대 오르지 않는다', () => {
+    const g = newGame();
+    answerWrong(g); answerWrong(g); answerWrong(g);
+    expect(g.floor).toBe(0);
+  });
+  it('시간이 흘러도 층은 오르지 않는다', () => {
+    const g = newGame();
+    g.advance(60_000);
+    expect(g.floor).toBe(0);
+  });
+});
+
+describe('SRS — 세션 큐와 영속 박스 [D11]', () => {
+  it('세션 큐가 반복 금지 창보다 우선해 3문항 뒤 재출제된다', () => {
+    const notes = new PersistentNotes();
+    const q = new SessionQueue();
+    const src = new QuestionSource({ subject: 'gugudan', rng: makeRng(3), sessionQueue: q, notes, now: NOW });
+    const first = src.next(2);
+    q.onWrong(first.id, src.index);
+    const seen = [];
+    for (let i = 0; i < 4; i++) seen.push(src.next(2).id);
+    expect(seen[2]).toBe(first.id);       // index 1,2,3 → 3번째가 재출제(1+3)
+    expect(SRS.NO_REPEAT_WINDOW).toBe(5); // 반복 금지 창보다 짧다 = 예외가 실제로 작동한다
+  });
+
+  it('세션 3회 정답이면 큐 졸업', () => {
+    const q = new SessionQueue();
+    q.onWrong('g:7x8', 0);
+    expect(q.onCorrect('g:7x8', 3)).toBe('advanced');
+    expect(q.onCorrect('g:7x8', 10)).toBe('advanced');
+    expect(q.onCorrect('g:7x8', 25)).toBe('graduated');
+    expect(q.has('g:7x8')).toBe(false);
+  });
+
+  it('영속 박스는 4회 정답에 졸업하고, 배지는 영속 박스를 읽는다', () => {
+    const n = new PersistentNotes();
+    const t = 1_700_000_000_000;
+    n.onWrong('g:7x8', t);
+    expect(n.progress('g:7x8')).toEqual({ box: 0, max: 4, graduated: false });
+    for (let i = 0; i < 3; i++) n.onCorrect('g:7x8', t);
+    expect(n.progress('g:7x8').box).toBe(3);
+    expect(n.progress('g:7x8').graduated).toBe(false); // 세션 3회로는 졸업이 아니다
+    n.onCorrect('g:7x8', t);
+    expect(n.progress('g:7x8').graduated).toBe(true);
+  });
+
+  it('박스 날짜가 BOX_DAYS 대로 밀린다', () => {
+    const n = new PersistentNotes();
+    const t = new Date('2026-09-04T09:00:00').getTime();
+    n.onCorrect('g:3x3', t);              // box 1 → +1일
+    expect(n.data['g:3x3'].due).toBe(dayKey(t + 1 * 86400000));
+    n.onCorrect('g:3x3', t);              // box 2 → +3일
+    expect(n.data['g:3x3'].due).toBe(dayKey(t + 3 * 86400000));
+    n.onCorrect('g:3x3', t);              // box 3 → +7일
+    expect(n.data['g:3x3'].due).toBe(dayKey(t + 7 * 86400000));
+    n.onCorrect('g:3x3', t);              // box 4 → +16일
+    expect(n.data['g:3x3'].due).toBe(dayKey(t + 16 * 86400000));
+  });
+
+  it('약점은 더 자주 나오되 더 어려워지지 않는다 — 가중은 WEIGHT_MAX 를 넘지 않는다', () => {
+    const n = new PersistentNotes();
+    const t = NOW();
+    n.onWrong('g:7x8', t);
+    expect(n.weight('g:7x8', t)).toBeLessThanOrEqual(SRS.WEIGHT_MAX);
+    expect(n.weight('g:7x8', t)).toBeGreaterThan(1);
+    expect(n.weight('g:2x2', t)).toBe(1); // 안 틀린 항목은 가중 없음
+  });
+});
+
+describe('세이브 [D12]', () => {
+  function memStore() {
+    const m = new Map();
+    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) };
+  }
+  it('키 네임스페이스와 버전 래퍼', () => {
+    expect(SAVE.KEY).toBe('oreudap:progress');
+    const st = memStore();
+    const data = emptySave(); data.coins = 42;
+    save(data, st);
+    expect(JSON.parse(st.getItem('oreudap:progress')).version).toBe(SAVE.VERSION);
+    expect(load(st).coins).toBe(42);
+  });
+  it('v1 → v2 마이그레이션', () => {
+    const v1 = { coins: 10, skin: 'fox', ownedSkins: ['fox'], best: 33, notes: {} };
+    const out = migrate(1, v1);
+    expect(out.best).toEqual({ gugudan: 33 });
+    expect(out.ownedThemes).toEqual(['dawn']);
+    expect(out.settings.sound).toBe(true);
+  });
+  it('깨진 저장·차단된 저장소에서 빈 세이브로 떨어진다', () => {
+    const bad = { getItem: () => '{"nope"', setItem: () => {}, removeItem: () => {} };
+    expect(load(bad).coins).toBe(0);
+    const throwing = { getItem: () => { throw new Error('blocked'); }, setItem: () => {}, removeItem: () => {} };
+    expect(load(throwing).coins).toBe(0);
+  });
+  it('알 수 없는 스킨·음수 코인을 정리한다', () => {
+    const s = sanitize({ coins: -5, skin: 'hacker', ownedSkins: ['hacker'], ownedThemes: [] });
+    expect(s.coins).toBe(0);
+    expect(s.skin).toBe('fox');
+    expect(s.ownedSkins).toEqual(['fox']);
+  });
+});
+
+describe('입력 버퍼 [D13]', () => {
+  it('활성화 직전 130ms 안의 입력은 버퍼돼 1회 판정된다', () => {
+    const g = newGame();
+    g.advance(50);
+    g.input(g.question.answerIndex);             // 정답 → RESOLVE 220ms
+    g.advance(TIMING.JUMP_MS - 100);             // 다음 활성화 100ms 전
+    const buffered = g.input(0);
+    expect(buffered.type).toBe('buffered');
+    g.advance(101);
+    expect(g.answered).toBe(true);               // 활성화 직후 소비됐다
+    expect(g.stats.asked).toBe(2);
+  });
+  it('버퍼 창(130ms) 밖의 입력은 버려진다', () => {
+    const g = newGame();
+    g.advance(50);
+    g.input(g.question.answerIndex);
+    const buffered = g.input(0);                 // RESOLVE 시작 = 활성화 220ms 전
+    expect(buffered.type).toBe('buffered');
+    g.advance(TIMING.JUMP_MS + 1);
+    expect(g.answered).toBe(false);
+  });
+  it('타임아웃 이후의 입력은 무시된다 — 하트는 타임아웃분 1만 깎인다', () => {
+    const g = newGame();
+    g.advance(g.timerMs + 1);                    // 타임아웃
+    expect(g.hearts).toBe(2);
+    g.input(0);                                  // 타임아웃 직후
+    g.advance(TIMING.STUMBLE_MS + TIMING.HIGHLIGHT_MS + 1);
+    expect(g.hearts).toBe(2);
+    expect(g.answered).toBe(false);
+  });
+});
+
+describe('일일 미션은 학습 행위에만 결부된다 [D27]', () => {
+  it('런 반복만으로는 달성되지 않는다', () => {
+    const s = emptySave();
+    for (let i = 0; i < 20; i++) applyRun(s, { correct: 0, bestStreak: 0, reviewCorrect: 0 }, NOW());
+    expect(s.coins).toBe(0);
+    expect(todayMissions(s, NOW()).every((m) => !m.claimed)).toBe(true);
+  });
+  it('정답 30개·스트릭 10·오답노트 5정답으로 달성된다', () => {
+    const s = emptySave();
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, NOW());
+    expect(s.coins).toBe(60);
+    expect(todayMissions(s, NOW()).every((m) => m.claimed)).toBe(true);
+  });
+  it('같은 미션을 두 번 지급하지 않는다', () => {
+    const s = emptySave();
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, NOW());
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, NOW());
+    expect(s.coins).toBe(60);
+  });
+  it('날짜가 바뀌면 초기화된다', () => {
+    const s = emptySave();
+    applyRun(s, { correct: 30, bestStreak: 10, reviewCorrect: 5 }, NOW());
+    const tomorrow = NOW() + 86400000;
+    expect(todayMissions(s, tomorrow).every((m) => !m.claimed)).toBe(true);
+  });
+});
+
+describe('상점 — 코스메틱만, 진행에 영향 없음', () => {
+  it('코인이 모자라면 못 산다', () => {
+    const s = emptySave();
+    expect(buy(s, 'skin', 'rabbit')).toEqual({ ok: false, reason: 'poor' });
+    s.coins = 60;
+    expect(buy(s, 'skin', 'rabbit').ok).toBe(true);
+    expect(s.coins).toBe(0);
+    expect(buy(s, 'skin', 'rabbit')).toEqual({ ok: false, reason: 'owned' });
+  });
+  it('보유하지 않은 것은 장착 불가', () => {
+    const s = emptySave();
+    expect(equip(s, 'skin', 'dragon')).toBe(false);
+    expect(s.skin).toBe('fox');
+  });
+});
+
+describe('결정론', () => {
+  it('같은 시드는 같은 문항 시퀀스를 낸다', () => {
+    const seq = (seed) => {
+      const g = newGame(seed);
+      const out = [];
+      for (let i = 0; i < 25; i++) { out.push(`${g.question.id}|${g.question.answerIndex}|${g.question.choices.join(',')}`); answerCorrect(g); }
+      return out;
+    };
+    expect(seq(42)).toEqual(seq(42));
+    expect(seq(42)).not.toEqual(seq(43));
+  });
+  it('문항 은행 크기 — 구구단 72, 영단어 밴드당 320(160×2방향)', () => {
+    expect(buildBank('gugudan').length).toBe(72);
+    expect(buildBank('words34').length).toBe(320);
+    expect(buildBank('words56').length).toBe(320);
+  });
+});

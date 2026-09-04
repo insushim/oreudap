@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "images": {
+    "char-fox": {
+      "file": "char-fox.webp",
+      "bytes": 25730,
+      "sha1": "8006556160a8",
+      "w": 384,
+      "h": 384
+    },
+    "char-rabbit": {
+      "file": "char-rabbit.webp",
+      "bytes": 24508,
+      "sha1": "298c43fec840",
+      "w": 384,
+      "h": 384
+    },
+    "char-penguin": {
+      "file": "char-penguin.webp",
+      "bytes": 19602,
+      "sha1": "a96c837aaf0e",
+      "w": 384,
+      "h": 384
+    },
+    "char-cat": {
+      "file": "char-cat.webp",
+      "bytes": 28032,
+      "sha1": "cdabc4425fde",
+      "w": 384,
+      "h": 384
+    },
+    "char-bear": {
+      "file": "char-bear.webp",
+      "bytes": 19500,
+      "sha1": "fb7338aeed47",
+      "w": 384,
+      "h": 384
+    },
+    "char-owl": {
+      "file": "char-owl.webp",
+      "bytes": 23174,
+      "sha1": "9de84da6e63b",
+      "w": 384,
+      "h": 384
+    },
+    "char-dragon": {
+      "file": "char-dragon.webp",
+      "bytes": 23282,
+      "sha1": "6b0566e53354",
+      "w": 384,
+      "h": 384
+    },
+    "platform-stone": {
+      "file": "platform-stone.webp",
+      "bytes": 18566,
+      "sha1": "0bd7a3d4ac9a",
+      "w": 512,
+      "h": 146
+    },
+    "platform-cloud": {
+      "file": "platform-cloud.webp",
+      "bytes": 21692,
+      "sha1": "b5878c77824c",
+      "w": 512,
+      "h": 240
+    },
+    "platform-wood": {
+      "file": "platform-wood.webp",
+      "bytes": 22068,
+      "sha1": "81ebeca67a05",
+      "w": 512,
+      "h": 166
+    },
+    "platform-crystal": {
+      "file": "platform-crystal.webp",
+      "bytes": 18864,
+      "sha1": "3e99c6a5c9aa",
+      "w": 512,
+      "h": 163
+    },
+    "bg-dawn": {
+      "file": "bg-dawn.webp",
+      "bytes": 11788,
+      "sha1": "167a86b35428",
+      "w": 720,
+      "h": 1280
+    },
+    "bg-day": {
+      "file": "bg-day.webp",
+      "bytes": 21098,
+      "sha1": "e75fe325c9c7",
+      "w": 720,
+      "h": 1280
+    },
+    "bg-sunset": {
+      "file": "bg-sunset.webp",
+      "bytes": 21000,
+      "sha1": "6f5035241955",
+      "w": 720,
+      "h": 1280
+    },
+    "bg-night": {
+      "file": "bg-night.webp",
+      "bytes": 24308,
+      "sha1": "8003eb00f8ac",
+      "w": 720,
+      "h": 1280
+    }
+  },
+  "themePlatform": {
+    "dawn": "stone",
+    "day": "cloud",
+    "sunset": "wood",
+    "night": "crystal"
+  },
+  "audio": {
+    "bgm": {
+      "ogg": "bgm.ogg",
+      "bytes": 768139,
+      "m4a": "bgm.m4a"
+    },
+    "button": {
+      "ogg": "button.ogg",
+      "bytes": 5497,
+      "m4a": "button.m4a"
+    },
+    "coin": {
+      "ogg": "coin.ogg",
+      "bytes": 9367,
+      "m4a": "coin.m4a"
+    },
+    "correct": {
+      "ogg": "correct.ogg",
+      "bytes": 10834,
+      "m4a": "correct.m4a"
+    },
+    "gameover": {
+      "ogg": "gameover.ogg",
+      "bytes": 8806,
+      "m4a": "gameover.m4a"
+    },
+    "streak": {
+      "ogg": "streak.ogg",
+      "bytes": 11003,
+      "m4a": "streak.m4a"
+    },
+    "timeout": {
+      "ogg": "timeout.ogg",
+      "bytes": 14034,
+      "m4a": "timeout.m4a"
+    },
+    "wrong": {
+      "ogg": "wrong.ogg",
+      "bytes": 9581,
+      "m4a": "wrong.m4a"
+    }
+  },
+  "audioBytes": 837261,
+  "totalBytes": 323212
+}

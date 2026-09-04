@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#101a2c" />
+<meta name="description" content="정답을 밟고 오르는 무한 학습 계단. 구구단과 영단어를 한눈에 즉답하며 층을 올리는 아케이드 학습 게임." />
+<title>오르답 — 정답을 밟고 오르는 무한 계단</title>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./src/ui/style.css" />
+</head>
+<body>
+<!-- Phaser 월드(배경·발판·캐릭터·이펙트)만 캔버스에 그린다.
+     글자와 터치 타깃은 전부 DOM 이다 — 캔버스 오브젝트에는 getBoundingClientRect 가 없어
+     44px·28px·대비 같은 불변식을 증명할 방법이 아예 없어지기 때문이다. -->
+<div id="world" aria-hidden="true"></div>
+
+<main id="app">
+  <!-- ── 타이틀 ───────────────────────────────────────────── -->
+  <section id="screen-title" class="screen active">
+    <header class="title-head">
+      <h1 class="logo"><span class="logo-mark">▲</span>오르답</h1>
+      <p class="tagline">정답을 밟아야 한 층 오른다</p>
+      <div class="coin-chip" id="title-coins" aria-live="polite"><span class="coin-ico">●</span><span id="title-coin-n">0</span></div>
+    </header>
+    <div class="subject-grid" id="subject-grid" role="list"></div>
+    <nav class="title-nav">
+      <button class="nav-btn" data-go="notes" type="button">오답노트</button>
+      <button class="nav-btn" data-go="collection" type="button">컬렉션</button>
+      <button class="nav-btn" data-go="settings" type="button">설정</button>
+    </nav>
+    <p class="footer-note">기록은 이 기기에만 저장됩니다. 이름·나이·계정을 받지 않습니다.</p>
+  </section>
+
+  <!-- ── 범위 선택 ─────────────────────────────────────────── -->
+  <section id="screen-scope" class="screen">
+    <button class="back-btn" data-go="title" type="button" aria-label="뒤로">←</button>
+    <h2 id="scope-title">범위 고르기</h2>
+    <div id="scope-body"></div>
+    <button class="primary-btn" id="scope-start" type="button">시작하기</button>
+  </section>
+
+  <!-- ── 플레이 ───────────────────────────────────────────── -->
+  <section id="screen-play" class="screen play">
+    <div class="hud">
+      <div class="hearts" id="hud-hearts" aria-label="남은 기회"></div>
+      <div class="floor-box"><span class="floor-n" id="hud-floor">0</span><span class="floor-unit">층</span></div>
+      <button class="icon-btn" id="btn-pause" type="button" aria-label="일시정지">॥</button>
+    </div>
+    <div class="qcard" id="qcard">
+      <div class="qtext" id="qtext">준비</div>
+      <div class="qsub" id="qsub"></div>
+      <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
+    </div>
+    <div id="choices" class="choices"></div>
+    <div class="feedback" id="feedback" aria-live="assertive"></div>
+    <div class="streak-chip" id="streak-chip" hidden></div>
+  </section>
+
+  <!-- ── 결과 ─────────────────────────────────────────────── -->
+  <section id="screen-result" class="screen">
+    <h2 class="result-title" id="result-title">기록</h2>
+    <div class="result-floor"><span id="result-floor">0</span><small>층</small></div>
+    <div class="result-grid">
+      <div><b id="result-acc">0%</b><span>정답률</span></div>
+      <div><b id="result-coin">0</b><span>모은 코인</span></div>
+      <div><b id="result-best">0</b><span>최고 기록</span></div>
+    </div>
+    <div class="result-gap" id="result-gap"></div>
+    <div class="miss-card" id="result-miss"></div>
+    <div class="result-actions">
+      <button class="primary-btn" id="btn-again" type="button">한 판 더</button>
+      <button class="ghost-btn" data-go="title" type="button">그만하기</button>
+    </div>
+  </section>
+
+  <!-- ── 오답노트 ─────────────────────────────────────────── -->
+  <section id="screen-notes" class="screen">
+    <button class="back-btn" data-go="title" type="button" aria-label="뒤로">←</button>
+    <h2>오답노트</h2>
+    <p class="hint">●가 4개가 되면 «완전히 내 거»예요. 며칠 간격으로 다시 나와요.</p>
+    <div id="notes-list" class="notes-list"></div>
+  </section>
+
+  <!-- ── 컬렉션 ───────────────────────────────────────────── -->
+  <section id="screen-collection" class="screen">
+    <button class="back-btn" data-go="title" type="button" aria-label="뒤로">←</button>
+    <h2>컬렉션</h2>
+    <div class="coin-chip big"><span class="coin-ico">●</span><span id="coll-coins">0</span></div>
+    <h3>친구</h3>
+    <div id="skin-list" class="shop-grid"></div>
+    <h3>하늘</h3>
+    <div id="theme-list" class="shop-grid"></div>
+  </section>
+
+  <!-- ── 설정 ─────────────────────────────────────────────── -->
+  <section id="screen-settings" class="screen">
+    <button class="back-btn" data-go="title" type="button" aria-label="뒤로">←</button>
+    <h2>설정</h2>
+    <div class="settings-list" id="settings-list"></div>
+    <h3>오늘의 미션</h3>
+    <div id="mission-list" class="mission-list"></div>
+    <h3>만든 것들</h3>
+    <p class="credits" id="credits"></p>
+  </section>
+
+  <!-- ── 일시정지 ─────────────────────────────────────────── -->
+  <div id="overlay-pause" class="overlay" hidden>
+    <div class="overlay-card">
+      <h2>잠깐 멈춤</h2>
+      <button class="primary-btn" id="btn-resume" type="button">이어하기</button>
+      <button class="ghost-btn" id="btn-quit" type="button">그만하기</button>
+    </div>
+  </div>
+</main>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

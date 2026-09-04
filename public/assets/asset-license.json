@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "project": "oreudap",
+  "entries": [
+    {
+      "file": "images/bg-dawn.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/bg-day.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/bg-night.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/bg-sunset.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-bear.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-cat.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-dragon.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-fox.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-owl.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-penguin.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-rabbit.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/platform-cloud.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/platform-crystal.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/platform-stone.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/platform-wood.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/bgm.m4a",
+      "license": "self-generated",
+      "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/bgm.ogg",
+      "license": "self-generated",
+      "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/button.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/button.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/coin.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/coin.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/correct.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/correct.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/gameover.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/gameover.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/streak.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/streak.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/timeout.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/timeout.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/wrong.m4a",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "audio/wrong.ogg",
+      "license": "self-generated",
+      "source": "game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.",
+      "date": "2026-09-04"
+    }
+  ]
+}

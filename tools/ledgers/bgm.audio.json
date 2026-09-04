@@ -1,0 +1,30 @@
+{
+  "verdict": "PASS",
+  "fails": [],
+  "warnings": [
+    "곡이 잦아들지 않는다 — 페이드 직전 5초 -19.69dB 가 본문 -20.75dB 대비 +1.1dB (기대: -1.0dB 이하). 가사 끝에 [Outro] 섹션이 있는지 확인할 것 — 페이드는 이걸 대신하지 못한다"
+  ],
+  "duration_s": 31.5,
+  "sample_rate": 192000,
+  "channels": 2,
+  "mean_db": -17.7,
+  "peak_db": -1.0,
+  "lufs": -15.6,
+  "audio": "/Users/iw-lab/Documents/dev/muhan/public/assets/audio/bgm.loop.wav",
+  "unmeasured": [],
+  "end_burst": {
+    "detected": false,
+    "tail_floor_db": -14.6,
+    "peak_db": -5.5,
+    "threshold_db": 12.0,
+    "max_burst_ms": 80
+  },
+  "ending_resolution": {
+    "delta_db": 1.06,
+    "body_db": -20.75,
+    "tail_db": -19.69,
+    "required_drop_db": 1.0,
+    "fade_out_s": 0.0,
+    "exempt": false
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "oreudap",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "오르답 — 정답을 밟고 오르는 무한 학습 계단",
+  "scripts": {
+    "dev": "vite --port 5199 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5198 --strictPort",
+    "test": "vitest run",
+    "gate:balance": "node tools/probe-grid.mjs --gate",
+    "gate:answers": "node tools/answer-balance.mjs",
+    "gate:data": "node tools/check-data.mjs",
+    "gate:all": "npm run gate",
+    "gate": "bash tools/gate-all.sh",
+    "gate:visual": "node tools/qa-visual.mjs --dir dist",
+    "gate:play": "node tools/qa-play.mjs --dir dist",
+    "gate:perf": "node tools/qa-perf.mjs --dir dist",
+    "gate:smoke": "node $HOME/.claude/skills/game-builder/tools/phaser-smoke.mjs --dir dist --page index.html --port 8181 --steps 600 --scene-cycles 5",
+    "assets": "python3 tools/process-assets.py && node tools/make-license.mjs",
+    "docs:sync": "node tools/sync-gdd-table.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0",
+    "pngjs": "^7.0.0",
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  }
+}

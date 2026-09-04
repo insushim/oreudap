@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="오르답">
+  <rect width="64" height="64" rx="14" fill="#0e1728"/>
+  <rect x="10" y="42" width="14" height="10" rx="3" fill="#4a5f8a"/>
+  <rect x="25" y="32" width="14" height="20" rx="3" fill="#7a8fc0"/>
+  <rect x="40" y="20" width="14" height="32" rx="3" fill="#ffd24a"/>
+  <path d="M43.5 31.5l3.2 3.4 6.1-7" fill="none" stroke="#2a1e00" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

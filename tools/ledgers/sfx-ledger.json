@@ -1,0 +1,212 @@
+[
+  {
+    "file": "bounce.wav",
+    "recipe": "bounce",
+    "seed": 40829,
+    "sha1": "7e1547de0e303b43f17f5428340d5343e9d29394",
+    "sec": 0.09,
+    "bytes": 7982,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "click.wav",
+    "recipe": "click",
+    "seed": 88343,
+    "sha1": "66d26e1c60e6591597ea6fd341461be60b2235e4",
+    "sec": 0.045,
+    "bytes": 4012,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "coin.wav",
+    "recipe": "coin",
+    "seed": 112100,
+    "sha1": "a0876dda9df12480cefc66e2885558ef9b06e231",
+    "sec": 0.29,
+    "bytes": 25622,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "countdown.wav",
+    "recipe": "countdown",
+    "seed": 151695,
+    "sha1": "5817e4aa47c5bdc7de545dd87c696669fff3d136",
+    "sec": 0.16,
+    "bytes": 14156,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "error.wav",
+    "recipe": "error",
+    "seed": 104181,
+    "sha1": "afb0ac831b675da3c52cde50d40d4e44f5aafde0",
+    "sec": 0.22,
+    "bytes": 19448,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "explosion.wav",
+    "recipe": "explosion",
+    "seed": 135857,
+    "sha1": "89a7166db964bce6342d21d9feff769038d85a9d",
+    "sec": 0.85,
+    "bytes": 75014,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "gauge_full.wav",
+    "recipe": "gauge_full",
+    "seed": 80424,
+    "sha1": "1d62ade56272460542d6e874346f9183c7cdb9c2",
+    "sec": 0.42,
+    "bytes": 37088,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "hit_hard.wav",
+    "recipe": "hit_hard",
+    "seed": 9153,
+    "sha1": "e0faef5f506f58715024eaf09ca4b009372572ca",
+    "sec": 0.16,
+    "bytes": 14156,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "hit_soft.wav",
+    "recipe": "hit_soft",
+    "seed": 1234,
+    "sha1": "e301e9cc209bbf561df8b298b7d8c8659cd77360",
+    "sec": 0.1,
+    "bytes": 8864,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "hurt.wav",
+    "recipe": "hurt",
+    "seed": 127938,
+    "sha1": "d88547743117454474449c2514169c68d114a09c",
+    "sec": 0.24,
+    "bytes": 21212,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "jump.wav",
+    "recipe": "jump",
+    "seed": 24991,
+    "sha1": "6fc5e67ec4b857c17e62779225ffd6e157713882",
+    "sec": 0.2,
+    "bytes": 17684,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "land.wav",
+    "recipe": "land",
+    "seed": 32910,
+    "sha1": "227e6686a9e810674ac95cd32f73ef6020d2d919",
+    "sec": 0.14,
+    "bytes": 12392,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "lose.wav",
+    "recipe": "lose",
+    "seed": 72505,
+    "sha1": "eaa020105e8028dcdaf44a9071742a7f5ae33385",
+    "sec": 0.64,
+    "bytes": 56492,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "point.wav",
+    "recipe": "point",
+    "seed": 56667,
+    "sha1": "bb1c0fcf1c2790af867f52ca729bf9a4722837ee",
+    "sec": 0.4,
+    "bytes": 35324,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "powerup.wav",
+    "recipe": "powerup",
+    "seed": 120019,
+    "sha1": "9cb53470a06bfce1eb3e5e05221aaa7db00c37e2",
+    "sec": 0.4,
+    "bytes": 35324,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "select.wav",
+    "recipe": "select",
+    "seed": 96262,
+    "sha1": "20b0dbfdb9800d186599fb1ff1aabea6aa39f1a6",
+    "sec": 0.2,
+    "bytes": 17684,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "special.wav",
+    "recipe": "special",
+    "seed": 17072,
+    "sha1": "73a1b726e7f2ab74fc25a0f517fa2603ef1ea665",
+    "sec": 0.75,
+    "bytes": 66194,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "start.wav",
+    "recipe": "start",
+    "seed": 159614,
+    "sha1": "2f398d22e35ff38c72cf00969ad5df71db8e0439",
+    "sec": 0.46,
+    "bytes": 40616,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "swoosh.wav",
+    "recipe": "swoosh",
+    "seed": 143776,
+    "sha1": "e4a6cd984f0c81667d4ea247df65e1340df933ea",
+    "sec": 0.3,
+    "bytes": 26504,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "whistle.wav",
+    "recipe": "whistle",
+    "seed": 48748,
+    "sha1": "8867d46ddc520981d6da977a441d81d649315851",
+    "sec": 0.55,
+    "bytes": 48554,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  },
+  {
+    "file": "win.wav",
+    "recipe": "win",
+    "seed": 64586,
+    "sha1": "cfc8e6185de2686c2e710510a6df78ce44b1e3d8",
+    "sec": 0.75,
+    "bytes": 66194,
+    "license": "self-generated",
+    "source": "game-builder/tools/gen-sfx.py"
+  }
+]

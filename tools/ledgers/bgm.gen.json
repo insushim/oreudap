@@ -1,0 +1,43 @@
+{
+  "seed": 2490502688,
+  "spec": "/var/folders/kf/91q531q94tzf_twn2y2hxb2h0000gn/T/tmp.LGOmJbGYNr/spec.json",
+  "engine": "/Users/iw-lab/.claude/engines/ACE-Step-1.5",
+  "spec_normalized": {
+    "bpm": 108,
+    "duration": 45,
+    "keyscale": "C major",
+    "timesignature": "4",
+    "language": "english"
+  },
+  "spec_warnings": [
+    "timesignature '4/4' → '4' 정규화(엔진은 분자만 받는다)",
+    "language='english' — 이 스킬의 발음 게이트는 한국어(ko) 전제다"
+  ],
+  "dit": "acestep-v15-xl-turbo",
+  "lm": "acestep-5Hz-lm-1.7B",
+  "offload": true,
+  "offline": {
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1"
+  },
+  "dit_load_s": 102.4,
+  "llm_load_s": 12.4,
+  "levers_unreached": [],
+  "levers_clamped": [],
+  "tiled_decode": true,
+  "seeded_rngs": [],
+  "gen_s": 197.3,
+  "success": true,
+  "total_s": 312.1,
+  "audio_seconds": 45.0,
+  "audio_seconds_source": "ffprobe(실측)",
+  "RTF_gen_only": 0.23,
+  "RTF_including_model_load": 0.14,
+  "RTF_definition": "audio_seconds / wall_clock_seconds (높을수록 빠름). total_s 는 이 프로세스의 엔진 초기화 이후 구간이며 파이썬 기동·import 시간은 포함하지 않는다",
+  "paths": [
+    "/var/folders/kf/91q531q94tzf_twn2y2hxb2h0000gn/T/tmp.LGOmJbGYNr/9c0ce88f-ffe9-e967-0536-d6242a9277dd.wav"
+  ],
+  "seed_actual": [
+    2490502688
+  ]
+}
