@@ -10,6 +10,9 @@ import { SHOP, HEART, SRS, TIMING } from './core/balance.js';
 import { computeLayout, columns } from './ui/layout.js';
 import { Sound } from './ui/sound.js';
 import { makeRng } from './core/rng.js';
+import { WORDS_G34 } from './data/words-g34.js';
+import { WORDS_G56 } from './data/words-g56.js';
+import { getNick, setNick, suggestNick, displayNick, fetchBoard, submitScore, todayKey } from './core/rankClient.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -21,8 +24,8 @@ const el = (tag, cls, text) => {
 
 const SUBJECT_META = {
   gugudan: { emoji: '✖️', desc: '2단부터 9단까지, 한눈에 즉답' },
-  words34: { emoji: '🅰️', desc: '3·4학년 기본 낱말 160개' },
-  words56: { emoji: '📘', desc: '5·6학년 기본 낱말 160개' },
+  words34: { emoji: '🅰️', desc: () => `3·4학년 기본 낱말 ${WORDS_G34.length}개` },
+  words56: { emoji: '📘', desc: () => `5·6학년 기본 낱말 ${WORDS_G56.length}개` },
 };
 
 export class App {
@@ -116,6 +119,66 @@ export class App {
       card.addEventListener('click', () => this.openScope(key));
       grid.append(card);
     }
+    this.renderBoard();
+  }
+
+  // ── 오늘의 등수 ─────────────────────────────────────────
+  /** 이름 칸은 «한 번만» 배선한다 — renderTitle 은 화면을 오갈 때마다 불린다. */
+  wireNick() {
+    if (this._nickWired) return;
+    this._nickWired = true;
+    const input = $('#nick');
+    const msg = $('#nick-msg');
+    const show = (text, bad) => {
+      msg.textContent = text;
+      msg.className = bad ? 'nick-msg bad' : 'nick-msg';
+      input.classList.toggle('bad', !!bad);
+    };
+    input.addEventListener('input', () => {
+      const r = setNick(input.value);
+      if (r.ok) show(`등수판에는 «${displayNick(r.nick)}» 로 올라가요`, false);
+      else show(input.value.trim() ? '이 이름은 쓸 수 없어요. 다른 이름을 지어 주세요.' : '', true);
+    });
+    // 🔴 칸을 떠날 때 못 쓰는 이름이면 저장된 이름으로 되돌린다 — 빈 칸으로 두지 않는다.
+    input.addEventListener('blur', () => { input.value = getNick(); show('', false); });
+    $('#nick-dice').addEventListener('click', () => {
+      const r = setNick(suggestNick());
+      if (r.ok) { input.value = r.nick; show(`«${r.nick}» 로 정했어요`, false); }
+      this.sound.play('button');
+    });
+  }
+
+  renderBoard() {
+    this.wireNick();
+    const nick = getNick();
+    $('#nick').value = nick;
+    $('#board-day').textContent = todayKey().slice(5).replace('-', '월 ') + '일';
+    const list = $('#board-list');
+    const note = $('#board-note');
+    const mine = displayNick(nick);
+
+    // 🔴 등수판은 «있으면 좋은 것»이다 — 인터넷이 없거나 서버가 죽어도 게임은 그대로 돌아간다.
+    note.textContent = '불러오는 중…';
+    fetchBoard(10).then((b) => {
+      list.textContent = '';
+      if (!b.rows.length) {
+        note.textContent = '오늘은 아직 아무도 오르지 않았어요. 첫 번째가 되어 보세요!';
+        return;
+      }
+      b.rows.forEach((r, i) => {
+        const li = el('li', i < 3 ? `top${i + 1}` : null);
+        if (r.n === mine) li.classList.add('me');
+        li.append(el('span', 'rk', String(i + 1)));
+        li.append(el('span', 'nm', r.n));
+        li.append(el('span', 'sb', (SUBJECTS[r.sub] && SUBJECTS[r.sub].label) || r.sub));
+        li.append(el('span', 'fl', `${r.s}층`));
+        list.append(li);
+      });
+      note.textContent = b.total > b.rows.length ? `오늘 ${b.total}명이 올랐어요` : '';
+    }).catch(() => {
+      list.textContent = '';
+      note.textContent = '등수판을 불러오지 못했어요. 게임은 그대로 즐길 수 있어요.';
+    });
   }
 
   // ── 범위 ────────────────────────────────────────────────
@@ -155,7 +218,7 @@ export class App {
       body.append(el('p', 'scope-note', '고르지 않으면 2단부터 9단까지 전부 나와요. 여러 단을 같이 골라도 돼요.'));
     } else {
       body.append(el('p', 'scope-note',
-        '낱말 160개를 «영어 → 뜻»과 «뜻 → 영어» 두 방향으로 물어봐요. 틀린 낱말은 오답노트에 담겨 며칠 뒤 다시 나와요.'));
+        `낱말 ${(subject === 'words34' ? WORDS_G34 : WORDS_G56).length}개를 «영어 → 뜻»과 «뜻 → 영어» 두 방향으로 물어봐요. 틀린 낱말은 오답노트에 담겨 며칠 뒤 다시 나와요.`));
     }
     this.go('scope');
   }
@@ -395,6 +458,11 @@ export class App {
     $('#result-gap').textContent = isBest
       ? '최고 기록을 넘었어요!'
       : `최고 기록까지 ${prevBest - c.floor}층 남았어요`;
+
+    // 오늘 판에 올린다. 실패해도 게임 흐름은 건드리지 않는다(있으면 좋은 것).
+    submitScore(this.subject, c.floor).then((r) => {
+      if (r && r.ok && r.rank) $("#result-gap").textContent = `오늘 ${r.rank}등! · ${this.data.best[this.subject]}층이 내 최고`;
+    }).catch(() => { /* 오프라인 — 조용히 넘어간다 */ });
 
     const miss = $('#result-miss');
     miss.textContent = '';

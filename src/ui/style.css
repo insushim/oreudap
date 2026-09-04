@@ -285,3 +285,62 @@ body.color-safe .choice.is-wrong .mark { display: inline; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+
+/* ── 오늘의 등수 ─────────────────────────────────────────────
+   🔴 첫 화면에서 바로 보여야 한다(사용자: 「아이들이 그것에 중요하게 생각한다」).
+      그래서 접어 두지 않고, 비어 있어도 자리를 차지한 채 «아직 없다»고 말한다. */
+.board {
+  width: min(100%, 560px);
+  margin: 22px auto 0;
+  padding: 14px 16px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  text-align: left;
+}
+.board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.board-head h2 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.board-day { font-size: 13px; color: var(--dim, #94a3b8); font-variant-numeric: tabular-nums; }
+
+.nick-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; }
+.nick-label { font-size: 14px; color: var(--dim, #94a3b8); flex: 0 0 auto; }
+.nick-input {
+  flex: 1 1 auto; min-width: 0;
+  min-height: 44px;                     /* 접근성 최소 터치 타깃 */
+  padding: 0 12px;
+  font-size: 16px;                      /* iOS 는 16px 미만이면 포커스 때 화면을 확대한다 */
+  font-family: inherit; font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 11px;
+}
+.nick-input:focus-visible { outline: 2px solid #ffd479; outline-offset: 1px; }
+.nick-input.bad { border-color: #ff8a96; }
+.nick-dice {
+  flex: 0 0 auto; width: 44px; height: 44px;
+  font-size: 19px; line-height: 1;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 11px; cursor: pointer; color: #fff;
+}
+.nick-msg { margin: 6px 0 0; font-size: 13px; min-height: 17px; color: var(--dim, #94a3b8); }
+.nick-msg.bad { color: #ff8a96; }
+
+.board-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.board-list li {
+  display: grid; grid-template-columns: 26px 1fr auto auto;
+  align-items: center; gap: 10px;
+  padding: 7px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 15px;
+}
+.board-list li:first-child { border-top: 0; }
+.board-list .rk { font-weight: 800; color: var(--dim, #94a3b8); font-variant-numeric: tabular-nums; }
+.board-list li.top1 .rk, .board-list li.top2 .rk, .board-list li.top3 .rk { color: #ffd479; }
+.board-list .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-list .sb { font-size: 12px; color: var(--dim, #94a3b8); }
+.board-list .fl { font-weight: 800; font-variant-numeric: tabular-nums; }
+.board-list li.me { background: rgba(255, 212, 121, 0.09); border-radius: 8px; }
+.board-note { margin: 9px 0 0; font-size: 13px; color: var(--dim, #94a3b8); }

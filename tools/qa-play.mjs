@@ -4,7 +4,10 @@
  *
  *  D13 끝단 입력  : 진짜 KeyboardEvent·포인터로 사람 오차를 실어 20회 이상. 판정 1회씩.
  *  D14 봇 플레이  : 실제 마우스 클릭으로 한 판을 끝까지. 런타임 오류 0.
- *  D21 개인정보   : 네트워크 요청이 자체 도메인 정적 GET 뿐. POST·beacon·쿼리값 0.
+ *  D21 개인정보   : 바깥으로 나가는 곳은 «등수 API 하나»뿐이고, 거기에도 실명이 실리지 않는다.
+ *                   🔴 2026-09-04 규칙 변경: 예전 기준은 «외부 요청 0건 · 입력 필드 0개» 였다.
+ *                      일일 등수가 들어오면서 그 대리 지표는 더 쓸 수 없다 — 대신 «지키려던 성질»을
+ *                      직접 잰다: 실명을 넣고 한 판을 돌린 뒤, 나간 바이트 어디에도 그 글자가 없는가.
  *  D22 오디오     : 첫 입력에서 언락 → 효과음 디코드·재생.
  *
  * 🔴 표본이 모자라면 «측정 무효»로 실패시킨다. 8/8 은 100% 가 아니라 표본 없음이다.
@@ -265,20 +268,89 @@ async function main() {
   // blob:<origin>/… 와 data: 는 «네트워크로 나가는 요청»이 아니다(브라우저 내부 객체).
   // 그걸 외부로 세면 게이트가 진짜 외부 전송을 가리는 잡음이 된다.
   const isLocal = (u) => u.startsWith(origin) || u.startsWith(`blob:${origin}`) || u.startsWith('data:');
-  const external = requests.filter((r) => !isLocal(r.url));
+  const RANK_HOST = 'https://oreudap-rank.simssijjang-d79.workers.dev';
+  const isRank = (u) => u.startsWith(`${RANK_HOST}/api/rank`);
   const blobs = requests.filter((r) => r.url.startsWith('blob:'));
-  const nonGet = requests.filter((r) => r.method !== 'GET');
-  const withQuery = requests.filter((r) => r.url.includes('?') && r.url.split('?')[1].length > 0);
-  const withBody = requests.filter((r) => r.post);
-  NOTE(`네트워크 요청 ${requests.length}건 · 외부 ${external.length} · 내부 blob ${blobs.length} · 비GET ${nonGet.length} · 쿼리 ${withQuery.length}`);
-  if (external.length) FAIL(`외부 도메인 요청 ${external.length}건: ${external.slice(0, 3).map((r) => r.url).join(', ')}`);
-  if (nonGet.length) FAIL(`GET 이 아닌 요청 ${nonGet.length}건: ${nonGet.slice(0, 3).map((r) => `${r.method} ${r.url}`).join(', ')}`);
-  if (withBody.length) FAIL(`본문이 실린 요청 ${withBody.length}건 — 데이터 전송`);
-  if (withQuery.length) FAIL(`쿼리스트링이 붙은 요청 ${withQuery.length}건: ${withQuery.slice(0, 2).map((r) => r.url).join(', ')}`);
+  const rank = requests.filter((r) => isRank(r.url));
+  const external = requests.filter((r) => !isLocal(r.url) && !isRank(r.url));
+  NOTE(`네트워크 요청 ${requests.length}건 · 내부 blob ${blobs.length} · 등수 API ${rank.length} · 그 밖의 외부 ${external.length}`);
 
-  const inputs = await page.evaluate(() => document.querySelectorAll('input, textarea, [contenteditable="true"]').length);
-  if (inputs > 0) FAIL(`입력 필드가 ${inputs}개 있다 — 개인정보를 받지 않는 설계여야 한다`);
-  NOTE(`입력 필드 ${inputs}개`);
+  // ① 바깥으로 나가는 곳은 등수 API 하나뿐이다
+  if (external.length) FAIL(`허용되지 않은 외부 요청 ${external.length}건: ${external.slice(0, 3).map((r) => r.url).join(', ')}`);
+
+  // ② 자체 도메인 요청은 여전히 «본문 없는 GET» 이어야 한다
+  const localBad = requests.filter((r) => isLocal(r.url) && (r.method !== 'GET' || r.post));
+  if (localBad.length) FAIL(`자체 도메인으로 데이터를 보내는 요청 ${localBad.length}건`);
+
+  // ③ 🔴 실명이 기기를 벗어나지 않는가 — 이 게이트의 핵심.
+  //    직접 지은 이름을 넣고 한 판을 정산시킨 뒤, 나간 «모든» 바이트에서 그 글자를 찾는다.
+  const SECRET = '김철수';
+  await page.evaluate((n) => { localStorage.setItem('oreudap:nick', n); }, SECRET);
+  const sent = [];
+  page.on('request', (r) => { if (isRank(r.url())) sent.push({ url: r.url(), body: r.postData() || '' }); });
+  await page.evaluate(() => { window.__SMOKE__.app.go('title'); });
+  const runInfo = await page.evaluate(async () => {
+    const app = window.__SMOKE__.app;
+    app.subject = 'gugudan';
+    app.scope = null;
+    app.startRun();
+    const seen = [];
+    for (let i = 0; i < 6; i++) {
+      const c = app.core;
+      seen.push(c ? c.phase : 'nocore');
+      if (!c || c.phase !== 'question' || c.answered) { await new Promise((r) => setTimeout(r, 200)); continue; }
+      app.press(c.question.answerIndex, 'pointer');
+      await new Promise((r) => setTimeout(r, 280));
+    }
+    const floor = app.core ? app.core.floor : -1;
+    const settled = app.settled;
+    // 🔴 «오늘 이미 올린 최고» 를 여기서 지운다 — 시작 시점에 지우면 앞 시험의 봇이
+    //    아직 돌고 있다가 더 높은 기록을 올려 이 런이 «최고가 아님»으로 건너뛰어진다(실측).
+    try { localStorage.removeItem('oreudap:sent'); } catch { /* 무시 */ }
+    const sentRaw = null;
+    app.quitRun();
+    return { floor, settled, phases: seen.join('>'), subject: app.subject, sentRaw };
+  });
+  await page.waitForTimeout(2000);
+  NOTE(`등수 제출용 런: ${runInfo.floor}층 · ${runInfo.subject} · settled ${runInfo.settled} · sent ${runInfo.sentRaw}`);
+
+  const leaked = sent.filter((r) => `${r.url}${r.body}`.includes(SECRET));
+  if (leaked.length) FAIL(`직접 지은 이름 "${SECRET}" 이 그대로 전송됐다 ${leaked.length}건 — 보내기 전에 가려야 한다`);
+  const posts = sent.filter((r) => r.body);
+  if (!posts.length) {
+    FAIL(`등수 제출이 한 건도 안 나갔다 — 측정 무효. 런 ${runInfo.floor}층 · settled ${runInfo.settled} · 흐름 ${runInfo.phases}`);
+  }
+  for (const p of posts) {
+    let body = null;
+    try { body = JSON.parse(p.body); } catch { FAIL('등수 제출 본문이 JSON 이 아니다'); continue; }
+    const keys = Object.keys(body).sort().join(',');
+    if (keys !== 'n,s,sub') FAIL(`등수 제출에 예상 밖 필드: ${keys} (n,s,sub 만 보내야 한다)`);
+    if (typeof body.n !== 'string' || !body.n.includes('*')) {
+      FAIL(`제출된 이름 "${body.n}" 에 별표가 없다 — 직접 지은 이름은 가려서 보내야 한다`);
+    }
+  }
+  NOTE(`등수 제출 ${posts.length}건 · 실명 유출 0 · 보낸 이름 예: ${posts[0] ? JSON.parse(posts[0].body).n : '-'}`);
+
+  // ④ 입력 칸은 «이름 하나»뿐이고, 개인정보를 받는 종류가 아니다
+  const inputInfo = await page.evaluate(() => {
+    const all = [...document.querySelectorAll('input, textarea, [contenteditable="true"]')];
+    return all.map((e) => ({
+      id: e.id, tag: e.tagName.toLowerCase(), type: (e.getAttribute('type') || '').toLowerCase(),
+      max: Number(e.getAttribute('maxlength')) || 0,
+    }));
+  });
+  const BANNED = ['email', 'tel', 'date', 'password', 'number', 'url', 'month', 'week'];
+  for (const f of inputInfo) {
+    if (BANNED.includes(f.type)) FAIL(`개인정보를 받는 입력 종류 "${f.type}" 이 있다 (#${f.id})`);
+    if (f.tag !== 'input') FAIL(`자유 서술 입력(${f.tag})이 있다 — 아이가 무엇이든 쓸 수 있는 칸은 두지 않는다`);
+  }
+  const nickFields = inputInfo.filter((f) => f.id === 'nick');
+  if (inputInfo.length !== 1 || nickFields.length !== 1) {
+    FAIL(`입력 칸이 ${inputInfo.length}개 — 허용은 이름 칸(#nick) 하나뿐이다`);
+  } else if (!(nickFields[0].max > 0 && nickFields[0].max <= 8)) {
+    FAIL(`이름 칸 maxlength=${nickFields[0].max} — 1~8 이어야 한다(길면 '5학년3반김철수' 가 들어간다)`);
+  }
+  NOTE(`입력 칸 ${inputInfo.length}개 (이름 칸만, maxlength ${nickFields[0] ? nickFields[0].max : '-'})`);
 
   const stored = await page.evaluate(() => {
     const out = {};
@@ -304,7 +376,7 @@ async function main() {
     for (const f of fails) console.log('  ✖ ' + f);
     process.exit(1);
   }
-  console.log('\n✅ 플레이 QA PASS (D13 · D14 · D21 · D22)');
+  console.log('\n✅ 플레이 QA PASS (D13 · D14 · D21 · D22 · D29)');
 }
 
 main().catch((e) => {

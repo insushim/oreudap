@@ -18,7 +18,7 @@ run() {
   fi
 }
 
-run "유닛 테스트 (D2~D13·D27)"        npx vitest run --reporter=dot
+run "유닛 테스트 (D2~D13·D27·D29)"    npx vitest run --reporter=dot
 run "학습 데이터 (D23)"               node tools/check-data.mjs
 run "정답 위치 균형 (D8)"             node tools/answer-balance.mjs
 run "밸런스 격자 (D10·D8b)"           node tools/probe-grid.mjs N=300 --gate
@@ -30,7 +30,7 @@ run "라이선스 게이트 (D20)"           "$HOME/.claude/bin/free-assets.sh" 
 run "빌드"                            npx vite build
 run "2D 스모크 (D17·D18·D19·D22)"     node "$HOME/.claude/skills/game-builder/tools/phaser-smoke.mjs" --dir dist --page index.html --port 8181 --steps 600 --scene-cycles 5
 run "시각 QA (D15·D16)"               node tools/qa-visual.mjs --dir dist
-run "플레이 QA (D13·D14·D21·D22)"     node tools/qa-play.mjs --dir dist
+run "플레이 QA (D13·D14·D21·D22·D29)" node tools/qa-play.mjs --dir dist
 run "올라가는 느낌 (D28)"             node tools/qa-climb.mjs --dir dist
 run "성능·번들 (D25)"                 node tools/qa-perf.mjs --dir dist
 

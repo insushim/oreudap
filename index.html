@@ -30,7 +30,25 @@
       <button class="nav-btn" data-go="collection" type="button">컬렉션</button>
       <button class="nav-btn" data-go="settings" type="button">설정</button>
     </nav>
-    <p class="footer-note">기록은 이 기기에만 저장됩니다. 이름·나이·계정을 받지 않습니다.</p>
+    <section class="board" aria-labelledby="board-h">
+      <div class="board-head">
+        <h2 id="board-h">오늘의 등수</h2>
+        <span class="board-day" id="board-day"></span>
+      </div>
+      <div class="nick-row">
+        <label class="nick-label" for="nick">내 이름</label>
+        <input id="nick" class="nick-input" type="text" maxlength="8" inputmode="text"
+               autocomplete="off" autocorrect="off" spellcheck="false" aria-describedby="nick-msg">
+        <button class="nick-dice" id="nick-dice" type="button" aria-label="다른 이름 뽑기">🎲</button>
+      </div>
+      <p class="nick-msg" id="nick-msg" aria-live="polite"></p>
+      <ol class="board-list" id="board-list" aria-live="polite"></ol>
+      <p class="board-note" id="board-note"></p>
+    </section>
+    <p class="footer-note">
+      기록은 이 기기에 저장됩니다. 나이·학교·계정은 받지 않습니다.<br>
+      등수판에 올라가는 것은 <b>이름과 층수뿐</b>이고, 직접 지은 이름은 <b>보내기 전에 가려집니다</b>(김철수 → 김*수).
+    </p>
   </section>
 
   <!-- ── 범위 선택 ─────────────────────────────────────────── -->

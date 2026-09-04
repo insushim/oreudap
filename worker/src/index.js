@@ -1,14 +1,14 @@
 // 오르답 일일 등수 API. 게임 자체는 Vercel 이 서빙하고, 여기는 판 하나만 맡는다.
 import { submitScore, topRows } from './board.js';
 
-const ALLOW = [
-  'https://muhan-pi.vercel.app',
-  'http://localhost:5173',
-  'http://127.0.0.1:4173',
-];
+const ALLOW = ['https://muhan-pi.vercel.app'];
+// 로컬 개발·게이트가 쓰는 오리진. 포트가 도구마다 달라 목록으로는 못 맞춘다(스모크 8181·플레이 8189…).
+// 🔴 CORS 는 여기서 «보호 장치»가 아니다 — 이 API 는 인증이 없어 curl 로는 어차피 누구나 부른다.
+//    실제 방어선은 acceptName(실명 거부)·MAX_FLOOR·이름당 한 줄이다.
+const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 function cors(origin) {
-  const ok = ALLOW.includes(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin || '');
+  const ok = ALLOW.includes(origin) || LOCAL.test(origin || '');
   return {
     'Access-Control-Allow-Origin': ok ? origin : ALLOW[0],
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
