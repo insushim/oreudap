@@ -76,17 +76,20 @@ def build(check=False):
     manifest = {'version': 1, 'images': {}, 'themePlatform': THEME_PLATFORM, 'audio': {}}
     problems = []
 
+    # 서 있는 포즈와 «점프 포즈» 두 벌. 점프는 프레임 애니메이션이 아니라 «자세 한 장»이다 —
+    # AI 는 프레임 간 연속성을 못 만들지만 자세 한 장은 잘 만든다(모션은 조달·자세는 생성).
     for name in CHARS:
-        src = RAW / f'char-{name}.png'
-        if not src.exists():
-            problems.append(f'누락: {src.name}')
-            continue
-        im = Image.open(src).convert('RGBA')
-        cov = alpha_coverage(im)
-        if cov < 0.04:
-            problems.append(f'{src.name}: 불투명 픽셀 {cov:.1%} — cutout 이 본체를 먹었다')
-        out = fit_square(im, CHAR_SIZE)
-        manifest['images'][f'char-{name}'] = write(out, OUT / f'char-{name}.webp')
+        for suffix, key in (('', ''), ('-jump', '-jump')):
+            src = RAW / f'char-{name}{suffix}.png'
+            if not src.exists():
+                problems.append(f'누락: {src.name}')
+                continue
+            im = Image.open(src).convert('RGBA')
+            cov = alpha_coverage(im)
+            if cov < 0.04:
+                problems.append(f'{src.name}: 불투명 픽셀 {cov:.1%} — cutout 이 본체를 먹었다')
+            out = fit_square(im, CHAR_SIZE)
+            manifest['images'][f'char-{name}{key}'] = write(out, OUT / f'char-{name}{key}.webp')
 
     for name in PLATFORMS:
         src = RAW / f'platform-{name}.png'

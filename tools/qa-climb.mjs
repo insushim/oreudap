@@ -10,6 +10,7 @@
  *  ③ 계단은 깊이 순으로 «서로 다른 높이»에 있다(겹쳐 있으면 계단이 아니다)
  *  ④ 배경 시차가 층마다 유의미하게 흐른다(46px/3500px = 안 보이던 옛 값 재발 방지)
  *  ⑤ 10층 «금 발판»이 실제로 남는다
+ *  ⑥ 도약 «중»에는 점프 자세 그림으로, 착지하면 서 있는 자세로 바뀐다
  *
  *   node tools/qa-climb.mjs [--dir dist] [--port 8191] [--floors 12]
  *   종료코드 0 PASS · 1 FAIL · 3 미실행
@@ -67,6 +68,7 @@ const snapshot = () => {
       const head = sc.char.y - sc.char.displayHeight;
       return +(head - top).toFixed(1);
     })(),
+    pose: sc.charTextureKey(),
     scrollY: +sc.targetScrollY.toFixed(1),
     floorH: +sc.layout.floorH.toFixed(1),
     h: sc.layout.h,
@@ -92,6 +94,7 @@ async function main() {
   }, null, { timeout: 15000 });
 
   const shots = [];
+  const midPoses = [];
   const first = await page.evaluate(snapshot);
   if (!first) { FAIL('씬 상태를 읽지 못함 — 측정 무효'); }
   shots.push(first);
@@ -108,7 +111,10 @@ async function main() {
       c.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
       c.click();
     }, ans);
-    await page.waitForTimeout(320);          // 착지 연출이 끝나기를 기다린다
+    await page.waitForTimeout(70);           // 도약 «중» — 점프 자세여야 한다
+    const mid = await page.evaluate(() => window.__SMOKE__.app.scene.charTextureKey());
+    if (mid) midPoses.push(mid);
+    await page.waitForTimeout(280);          // 착지 연출이 끝나기를 기다린다
     const s = await page.evaluate(snapshot);
     if (s) shots.push(s);
   }
@@ -143,6 +149,15 @@ async function main() {
   // 0px 는 «닿기 직전»이다 — 조금만 흔들려도 파묻힌다. 눈에 보이는 여유를 요구한다.
   else if (worst < 8) FAIL(`캐릭터 머리와 위 발판 사이 여유가 ${worst.toFixed(0)}px — 8px 미만이면 붙어 보인다`);
 
+  // ⑥ 도약 중에는 점프 자세, 착지 뒤에는 서 있는 자세
+  const jumpFrames = midPoses.filter((k) => k && k.endsWith('-jump')).length;
+  if (!midPoses.length) FAIL('도약 중 자세를 재지 못함 — 측정 무효');
+  else if (jumpFrames < midPoses.length * 0.8) {
+    FAIL(`도약 ${midPoses.length}회 중 점프 자세는 ${jumpFrames}회 — 그림이 안 바뀐다(자세 한 장이 빠졌거나 배선이 끊겼다)`);
+  }
+  const landedIdle = settled.filter((s) => s.pose && !s.pose.endsWith('-jump')).length;
+  if (landedIdle < settled.length) FAIL(`착지 뒤에도 점프 자세로 남은 장면 ${settled.length - landedIdle}건`);
+
   // ④ 배경 시차가 층마다 유의미하다
   const perFloor = (last.scrollY - shots[0].scrollY) / Math.max(1, climbed);
   if (perFloor < last.floorH * 0.4) {
@@ -165,6 +180,7 @@ async function main() {
   console.log(`  · 보이는 지나온 계단 최소 ${minStairs}개 · 한 층 ${last.floorH.toFixed(0)}px`);
   console.log(`  · 캐릭터 머리 여유 최소 ${worst == null ? '?' : worst.toFixed(0)}px`);
   console.log(`  · 배경 시차 층당 ${perFloor.toFixed(1)}px`);
+  console.log(`  · 점프 자세 ${jumpFrames}/${midPoses.length}회 · 착지 후 서 있는 자세 ${landedIdle}/${settled.length}`);
   if (fails.length) { console.log(''); for (const f of fails) console.log(`  ❌ ${f}`); process.exit(1); }
   console.log('\n✅ 올라가는 느낌 PASS');
 }

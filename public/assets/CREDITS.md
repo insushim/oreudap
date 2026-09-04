@@ -4,7 +4,7 @@
 
 | 종류 | 개수 | 만든 방법 |
 |---|---|---|
-| 캐릭터·발판·배경 이미지 | 15 | Meta AI 이미지 생성 후 배경 제거·리사이즈 |
+| 캐릭터·발판·배경 이미지 | 22 | Meta AI 이미지 생성 후 배경 제거·리사이즈 |
 | 효과음 | 14 | 오프라인 결정론 렌더(numpy 합성) |
 | 배경 음악 | 2 | ACE-Step 로컬 생성, 이음새 없는 루프 |
 | 글꼴 | 0 | 기기에 이미 있는 시스템 글꼴만 사용(외부 요청 0) |
@@ -20,12 +20,19 @@
 - `images/bg-day.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/bg-night.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/bg-sunset.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-bear-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-bear.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-cat-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-cat.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-dragon-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-dragon.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-fox-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-fox.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-owl-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-owl.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-penguin-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-penguin.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
+- `images/char-rabbit-jump.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/char-rabbit.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/platform-cloud.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
 - `images/platform-crystal.webp` — Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.
@@ -48,4 +55,4 @@
 - `audio/wrong.m4a` — game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.
 - `audio/wrong.ogg` — game-builder gen-sfx.py 오프라인 결정론 렌더(numpy) → loudnorm·ogg/m4a 변환.
 
-기계가 읽는 원장은 `asset-license.json` 에 있습니다(31개 항목).
+기계가 읽는 원장은 `asset-license.json` 에 있습니다(38개 항목).

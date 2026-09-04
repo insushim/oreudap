@@ -74,6 +74,7 @@ export class WorldScene extends Phaser.Scene {
     this.charCol = 0;
     this.floorsClimbed = 0;
     this.pendingLand = null;
+    this.pose = 'idle';
     this.ready = false;
   }
 
@@ -268,6 +269,7 @@ export class WorldScene extends Phaser.Scene {
     const dur = this.reduced ? 1 : 150;
     const topY = -this.layout.floorH;
     this.charCol = index;
+    this.setPose('jump');          // 🔴 트윈을 만들기 전에 — scale 을 다시 잡기 때문
 
     this.track(this.tweens.add({
       targets: [this.char, this.shadow],
@@ -338,6 +340,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     const footX = this.stack[0] ? this.stack[0].x : this.char.x;
+    this.setPose('idle');
     this.char.setPosition(footX, 0);
     this.char.setScale(this.char.scaleX, Math.abs(this.char.scaleY));
     this.shadow.setPosition(footX, 2).setAlpha(0.28);
@@ -384,8 +387,29 @@ export class WorldScene extends Phaser.Scene {
 
   setSkin(skin) {
     this.skin = skin;
-    if (this.char && this.textures.exists(`char-${skin}`)) this.char.setTexture(`char-${skin}`);
+    this.pose = 'idle';
+    if (!this.char || !this.char.scene) return;
+    if (this.textures.exists(`char-${skin}`)) this.char.setTexture(`char-${skin}`);
     if (this.layout) this.char.setDisplaySize(this.layout.charSize, this.layout.charSize);
+  }
+
+  /**
+   * 자세 교체 — «점프 포즈 한 장»이다. 프레임 애니메이션이 아니다.
+   * 🔴 AI 는 프레임 간 연속성을 못 만들지만 «자세 한 장»은 잘 만든다. 그래서 모션은 코드가
+   *    만들고(트윈), 자세만 그림으로 바꾼다. 그림이 없으면 조용히 서 있는 자세를 쓴다.
+   * 🔴 반드시 트윈을 «만들기 전»에 부른다 — setDisplaySize 가 scale 을 다시 잡으므로
+   *    도약 중에 부르면 진행 중인 scaleY 트윈과 싸운다.
+   */
+  setPose(pose) {
+    // 🔴 파괴된 GameObject 도 «truthy» 다 — 씬을 재시작하면 이전 인스턴스의 캐릭터가
+    //    참조로 남아 setTexture 안에서 this.scene.sys 를 읽다 터진다(스모크가 잡았다).
+    //    살아 있는지는 .scene 이 남아 있는가로 본다.
+    if (!this.char || !this.char.scene || !this.layout) return;
+    const key = pose === 'jump' ? `char-${this.skin}-jump` : `char-${this.skin}`;
+    if (!this.textures.exists(key) || this.char.texture.key === key) return;
+    this.pose = pose;
+    this.char.setTexture(key);
+    this.char.setDisplaySize(this.layout.charSize, this.layout.charSize);
   }
 
   setTheme(theme) {
@@ -422,7 +446,7 @@ export class WorldScene extends Phaser.Scene {
       ground.setPosition(this.layout.w / 2, platOffset(this.layout, gh));
       this.stack.push(ground);
     }
-    if (this.char) this.char.setAngle(0).setAlpha(1);
+    if (this.char) { this.setPose('idle'); this.char.setAngle(0).setAlpha(1); }
     this.applyLayout();
   }
 
@@ -448,6 +472,9 @@ export class WorldScene extends Phaser.Scene {
     return this.tracked.filter((t) => t.isPlaying && t.isPlaying()
       && (t.targets || []).some((o) => o && o.scene === undefined)).length;
   }
+
+  /** QA 훅: 지금 캐릭터가 쓰고 있는 텍스처 키 */
+  charTextureKey() { return this.char && this.char.scene ? this.char.texture.key : null; }
 
   /** QA 훅: 지금 화면에 보이는 «지나온 계단» 수 */
   visibleStairs() {

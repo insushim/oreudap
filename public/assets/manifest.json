@@ -8,10 +8,24 @@
       "w": 384,
       "h": 384
     },
+    "char-fox-jump": {
+      "file": "char-fox-jump.webp",
+      "bytes": 26748,
+      "sha1": "ae30df4d0996",
+      "w": 384,
+      "h": 384
+    },
     "char-rabbit": {
       "file": "char-rabbit.webp",
       "bytes": 24508,
       "sha1": "298c43fec840",
+      "w": 384,
+      "h": 384
+    },
+    "char-rabbit-jump": {
+      "file": "char-rabbit-jump.webp",
+      "bytes": 24484,
+      "sha1": "771ae89be135",
       "w": 384,
       "h": 384
     },
@@ -22,10 +36,24 @@
       "w": 384,
       "h": 384
     },
+    "char-penguin-jump": {
+      "file": "char-penguin-jump.webp",
+      "bytes": 19940,
+      "sha1": "e12df5a905b9",
+      "w": 384,
+      "h": 384
+    },
     "char-cat": {
       "file": "char-cat.webp",
       "bytes": 28032,
       "sha1": "cdabc4425fde",
+      "w": 384,
+      "h": 384
+    },
+    "char-cat-jump": {
+      "file": "char-cat-jump.webp",
+      "bytes": 31788,
+      "sha1": "058c9b431fab",
       "w": 384,
       "h": 384
     },
@@ -36,6 +64,13 @@
       "w": 384,
       "h": 384
     },
+    "char-bear-jump": {
+      "file": "char-bear-jump.webp",
+      "bytes": 22390,
+      "sha1": "4bc4a3a54ae7",
+      "w": 384,
+      "h": 384
+    },
     "char-owl": {
       "file": "char-owl.webp",
       "bytes": 23174,
@@ -43,10 +78,24 @@
       "w": 384,
       "h": 384
     },
+    "char-owl-jump": {
+      "file": "char-owl-jump.webp",
+      "bytes": 24066,
+      "sha1": "77c3ba0a532e",
+      "w": 384,
+      "h": 384
+    },
     "char-dragon": {
       "file": "char-dragon.webp",
       "bytes": 23282,
       "sha1": "6b0566e53354",
+      "w": 384,
+      "h": 384
+    },
+    "char-dragon-jump": {
+      "file": "char-dragon-jump.webp",
+      "bytes": 25216,
+      "sha1": "bef66cf1e6a5",
       "w": 384,
       "h": 384
     },
@@ -156,5 +205,5 @@
     }
   },
   "audioBytes": 837261,
-  "totalBytes": 323212
+  "totalBytes": 497844
 }

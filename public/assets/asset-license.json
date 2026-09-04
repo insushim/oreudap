@@ -27,7 +27,19 @@
       "date": "2026-09-04"
     },
     {
+      "file": "images/char-bear-jump.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
       "file": "images/char-bear.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-cat-jump.webp",
       "license": "self-generated",
       "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
       "date": "2026-09-04"
@@ -39,7 +51,19 @@
       "date": "2026-09-04"
     },
     {
+      "file": "images/char-dragon-jump.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
       "file": "images/char-dragon.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-fox-jump.webp",
       "license": "self-generated",
       "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
       "date": "2026-09-04"
@@ -51,13 +75,31 @@
       "date": "2026-09-04"
     },
     {
+      "file": "images/char-owl-jump.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
       "file": "images/char-owl.webp",
       "license": "self-generated",
       "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
       "date": "2026-09-04"
     },
     {
+      "file": "images/char-penguin-jump.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
       "file": "images/char-penguin.webp",
+      "license": "self-generated",
+      "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "images/char-rabbit-jump.webp",
       "license": "self-generated",
       "source": "Meta AI 이미지 생성 → 배경 제거·리사이즈(tools/process-assets.py). 오르답 제작진이 이 게임을 위해 생성.",
       "date": "2026-09-04"
