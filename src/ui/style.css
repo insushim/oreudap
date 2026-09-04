@@ -177,11 +177,17 @@ h3 { font-size: 17px; margin: 20px 0 8px; align-self: flex-start; width: 100%; m
   background: rgba(11, 19, 35, 0.86);
   border: 2px solid rgba(255, 255, 255, 0.38);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
-  font-size: clamp(28px, 7vw, 40px); font-weight: 800; line-height: 1.15;
+  font-size: clamp(30px, 7vw, 40px); font-weight: 800; line-height: 1.12;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* 🔴 잘라내지 않는다. 「필요하다」가 «필요하…» 로 나오면 문제가 성립하지 않는다.
+     keep-all 은 한국어 낱말 «안»에서 끊지 않고 띄어쓰기에서만 접는다. */
+  white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+  text-align: center;
   transition: background .12s ease, border-color .12s ease;
 }
+/* 뜻이 길수록 글자를 낮춘다 — 게이트 하한 28px 는 넘지 않는다(읽을 수 있어야 한다). */
+.choice.len-m .txt { font-size: clamp(28px, 5.6vw, 33px); padding: 9px 13px; }
+.choice.len-l .txt { font-size: 28px; padding: 8px 10px; line-height: 1.08; }
 .choice:active { transform: scale(0.96); }
 .choice:focus-visible { outline: none; }
 .choice:focus-visible .txt { outline: 3px solid var(--accent); outline-offset: 3px; }

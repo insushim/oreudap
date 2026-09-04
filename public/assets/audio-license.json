@@ -2,6 +2,30 @@
   "version": 1,
   "entries": [
     {
+      "file": "bgm-rush.m4a",
+      "license": "self-generated",
+      "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "bgm-rush.ogg",
+      "license": "self-generated",
+      "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "bgm-tense.m4a",
+      "license": "self-generated",
+      "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",
+      "date": "2026-09-04"
+    },
+    {
+      "file": "bgm-tense.ogg",
+      "license": "self-generated",
+      "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",
+      "date": "2026-09-04"
+    },
+    {
       "file": "bgm.m4a",
       "license": "self-generated",
       "source": "ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.",

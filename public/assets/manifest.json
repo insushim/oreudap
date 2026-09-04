@@ -163,6 +163,18 @@
     "night": "crystal"
   },
   "audio": {
+    "bgm-rush": {
+      "ogg": "bgm-rush.ogg",
+      "bytes": 784658,
+      "lazy": true,
+      "m4a": "bgm-rush.m4a"
+    },
+    "bgm-tense": {
+      "ogg": "bgm-tense.ogg",
+      "bytes": 770450,
+      "lazy": true,
+      "m4a": "bgm-tense.m4a"
+    },
     "bgm": {
       "ogg": "bgm.ogg",
       "bytes": 768139,
@@ -204,6 +216,7 @@
       "m4a": "wrong.m4a"
     }
   },
-  "audioBytes": 837261,
+  "audioBytes": 2392369,
+  "eagerAudioBytes": 837261,
   "totalBytes": 497844
 }

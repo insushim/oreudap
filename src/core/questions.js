@@ -5,7 +5,7 @@ import { WORDS_G34 } from '../data/words-g34.js';
 import { WORDS_G56 } from '../data/words-g56.js';
 import { gugudanDistractors, wordDistractors } from './distractors.js';
 import { PositionDeck } from './positionDeck.js';
-import { SRS } from './balance.js';
+import { SRS, tierIndexFor } from './balance.js';
 import { pickWeighted } from './rng.js';
 
 export const SUBJECTS = {
@@ -14,20 +14,55 @@ export const SUBJECTS = {
   words56: { id: 'words56', label: '영단어 5·6학년', hint: '무슨 뜻일까요?' },
 };
 
+/**
+ * 문항 난이도 등급 1~3.
+ * 🔴 「올라갈수록 어려워진다」의 정본. 시계만 빨라지면 문제는 처음이나 90층이나 같아서
+ *    «높이»가 실력이 아니라 손속도만 재게 된다. 등급을 층으로 열어 «내용»도 올라가게 한다.
+ *
+ * 구구단 — 아이가 실제로 어려워하는 순서로 나눈다:
+ *   1등급 2·5단, 그리고 ×1·×2·×5 (덧셈으로도 풀린다)
+ *   3등급 7·8·9단 × 6~9 (외워야만 나온다)
+ *   2등급 나머지
+ * 영단어 — 철자 길이 + 방향. 「뜻 → 영어」는 재인이 아니라 «인출»이라 한 단계 어렵다.
+ */
+export function tierOf(item) {
+  if (item.a != null) {
+    const { a, b } = item;
+    if (a === 2 || a === 5 || b === 1 || b === 2 || b === 5) return 1;
+    if (a >= 7 && b >= 6) return 3;
+    return 2;
+  }
+  const len = item.entry.w.length;
+  const base = len <= 4 ? 1 : len <= 6 ? 2 : 3;
+  return item.dir === 'k2w' ? Math.min(3, base + 1) : base;
+}
+
+/** 층 n 에서 «열려 있는» 최고 등급. GDD §1-4-1 */
+export function maxTierFor(floor) {
+  return tierIndexFor(floor) + 1;   // 층 경계는 balance.TIER_FLOORS 하나뿐이다
+}
+
 export function buildBank(subject, scope) {
   if (subject === 'gugudan') {
     const dans = scope && scope.length ? scope : [2, 3, 4, 5, 6, 7, 8, 9];
     const items = [];
     for (const a of dans) {
-      for (let b = 1; b <= 9; b++) items.push({ id: `g:${a}x${b}`, a, b });
+      for (let b = 1; b <= 9; b++) {
+        const it = { id: `g:${a}x${b}`, a, b };
+        it.tier = tierOf(it);
+        items.push(it);
+      }
     }
     return items;
   }
   const pool = subject === 'words34' ? WORDS_G34 : WORDS_G56;
   const items = [];
   for (const e of pool) {
-    items.push({ id: `w:${subject}:${e.w}:w2k`, entry: e, dir: 'w2k' });
-    items.push({ id: `w:${subject}:${e.w}:k2w`, entry: e, dir: 'k2w' });
+    for (const dir of ['w2k', 'k2w']) {
+      const it = { id: `w:${subject}:${e.w}:${dir}`, entry: e, dir };
+      it.tier = tierOf(it);
+      items.push(it);
+    }
   }
   return items;
 }
@@ -52,12 +87,16 @@ export class QuestionSource {
     this.notes = notes;
     this.now = now;
     this.recent = [];
+    // 🔴 이번 판에 몇 번 냈는지. 반복 금지 창(직전 5문항)만으로는 «한 판에 세 번»을 못 막는다 —
+    //    창을 벗어나면 가중이 그대로 돌아오기 때문이다. 낸 만큼 덜 나오게 한다.
+    //    약점 가중(notes.weight)과 «곱»해지므로 틀린 문항이 다시 나오는 길은 막지 않는다.
+    this.asked = new Map();
     this.index = 0;
     this.decks = { 2: new PositionDeck(2, rng), 3: new PositionDeck(3, rng) };
   }
 
-  /** 다음 문항. branches 는 호출자가 층에서 계산해 넘긴다. */
-  next(branches) {
+  /** 다음 문항. branches·floor 는 호출자가 층에서 계산해 넘긴다. */
+  next(branches, floor = 1) {
     const deck = this.decks[branches];
     if (!deck) throw new Error(`덱 없음: ${branches}`);
 
@@ -69,10 +108,11 @@ export class QuestionSource {
       item = this.byId.get(dueId);
       fromReview = true;
     } else {
-      item = this.pickWeighted();
+      item = this.pickWeighted(floor);
     }
 
     this.index += 1;
+    this.asked.set(item.id, (this.asked.get(item.id) || 0) + 1);
     this.recent.push(item.id);
     if (this.recent.length > SRS.NO_REPEAT_WINDOW) this.recent.shift();
 
@@ -82,12 +122,26 @@ export class QuestionSource {
     return { ...built, id: item.id, fromReview, index: this.index };
   }
 
-  pickWeighted() {
+  pickWeighted(floor = 1) {
     const banned = new Set(this.recent);
-    let candidates = this.items.filter((it) => !banned.has(it.id));
+    const maxTier = maxTierFor(floor);
+    // 🔴 「한 판에 같은 문항은 두 번까지」를 규칙으로 «직접» 쓴다.
+    //    가중 감쇠만으로는 꼬리가 남는다 — 구구단은 은행이 72종뿐이라 확률로는 못 막는다(실측).
+    //    복습 큐(틀린 문항 재출제)는 이 경로를 타지 않으므로 학습 반복은 그대로 살아 있다.
+    const MAX_PER_RUN = 2;
+    const fresh = (it) => (this.asked.get(it.id) || 0) < MAX_PER_RUN;
+    let candidates = this.items.filter((it) => !banned.has(it.id) && it.tier <= maxTier && fresh(it));
+    if (candidates.length < 4) candidates = this.items.filter((it) => !banned.has(it.id) && fresh(it));
+    // 🔴 범위를 좁게 고르면(예: 7단만) 낮은 등급이 아예 없을 수 있다 —
+    //    그때는 등급 제한을 풀어야 «낼 문항이 없는» 상태가 되지 않는다.
+    if (candidates.length < 4) candidates = this.items.filter((it) => !banned.has(it.id));
     if (candidates.length === 0) candidates = this.items;
     const ts = this.now();
-    const weights = candidates.map((it) => this.notes.weight(it.id, ts));
+    // 높이 올라갈수록 어려운 등급을 더 자주 낸다(약점 가중과 곱해진다).
+    const tierBoost = floor >= 40 ? 2 : floor >= 25 ? 1.4 : 1;
+    const weights = candidates.map((it) => this.notes.weight(it.id, ts)
+      * (it.tier === maxTier && maxTier > 1 ? tierBoost : 1)
+      / (1 + 2 * (this.asked.get(it.id) || 0)));
     return pickWeighted(this.rng, candidates, weights);
   }
 

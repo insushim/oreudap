@@ -33,6 +33,9 @@ async function boot() {
 
   try {
     const manifest = await loadManifest();
+    // 🔴 강도 BGM(bgm-tense·bgm-rush)은 preload 에 넣지 않는다 — 두 곡이 760KB 라
+    //    「첫 문제까지 전송량」예산(D25)을 그대로 잡아먹는다. 판이 시작된 뒤 첫 정답에서 받아 온다.
+    const eagerAudio = Object.keys(manifest.audio || {}).filter((k) => !manifest.audio[k].lazy);
     const app = new App({ scene: null, seedFn: newSeed });
     const sceneData = () => ({
       manifest,
@@ -60,7 +63,8 @@ async function boot() {
     });
 
     app.scene = world;
-    app.sound.attach(world, Object.keys(manifest.audio || {}));
+    app.sound.attach(world, eagerAudio);
+    app.sound.setManifest(manifest);
     app.init();
 
     const failedAssets = (world.loadErrors || []).filter(Boolean);
@@ -73,7 +77,7 @@ async function boot() {
       game,
       app,
       expectedTextures: [...Object.keys(manifest.images), 'spark'],
-      expectedAudio: Object.keys(manifest.audio || {}),
+      expectedAudio: eagerAudio,
       seed: (n) => app.smokeSeed(n),
       step: (ms) => app.step(ms),
       hash: () => app.hash(),
@@ -85,7 +89,8 @@ async function boot() {
           game.scene.stop('Idle');
           game.scene.start('World', sceneData());
           app.scene = world;
-          app.sound.attach(world, Object.keys(manifest.audio || {}));
+          app.sound.attach(world, eagerAudio);
+          app.sound.setManifest(manifest);
           // 🔴 재시작하면 발판이 전부 숨겨진 상태다 — 지금 문항으로 다시 세우지 않으면
           //    DOM 선택지와 월드 발판이 다음 문항까지 어긋난 채로 남는다.
           setTimeout(() => {

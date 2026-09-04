@@ -7,7 +7,7 @@ import { PersistentNotes, SessionQueue, dayKey } from '../src/core/srs.js';
 import { PositionDeck, hasRun } from '../src/core/positionDeck.js';
 import { gugudanDistractors, gugudanCandidates, wordDistractors } from '../src/core/distractors.js';
 import { buildBank, QuestionSource } from '../src/core/questions.js';
-import { timerFor, branchesFor, TIMING, HEART, COIN, SRS, SAVE } from '../src/core/balance.js';
+import { timerFor, branchesFor, TIMING, HEART, COIN, SRS, SAVE, TIMER, BRANCH } from '../src/core/balance.js';
 import { makeRng } from '../src/core/rng.js';
 import { load, save, migrate, emptySave, sanitize } from '../src/core/storage.js';
 import { applyRun, buy, equip, todayMissions } from '../src/core/economy.js';
@@ -127,11 +127,21 @@ describe('스트릭 10마다 하트 회복 [D5]', () => {
 });
 
 describe('타이머 식 [D6]', () => {
-  it('층 1·100·200 값이 식과 일치', () => {
-    expect(timerFor(1)).toBeCloseTo(3.189, 3);
-    expect(timerFor(100)).toBeCloseTo(2.1, 3);
-    expect(timerFor(200)).toBeCloseTo(1.0, 3);
-    expect(timerFor(500)).toBe(1.0); // 바닥
+  // 🔴 수치를 손으로 적지 않는다 — 밸런스를 조정할 때마다 어긋난다(L-070).
+  //    식이 상수와 «같은지»를 보고, 성질(단조 감소·하한·실력 천장)을 따로 단언한다.
+  it('식이 상수와 일치하고, 하한 아래로 내려가지 않는다', () => {
+    for (const f of [1, 20, 50, 100, 200, 500]) {
+      expect(timerFor(f)).toBeCloseTo(Math.max(TIMER.TMIN, TIMER.T0 - TIMER.K * f), 6);
+      expect(timerFor(f)).toBeGreaterThanOrEqual(TIMER.TMIN);
+    }
+  });
+  it('층이 오르면 반드시 짧아진다 — 그리고 사람 반응시간 언저리에서 멈춘다', () => {
+    for (let f = 1; f < 200; f++) expect(timerFor(f + 1)).toBeLessThanOrEqual(timerFor(f));
+    // 🔴 실력 천장이 있어야 엔드리스가 «끝»난다. 하한이 반응시간(평균 0.85초)보다
+    //    한참 위면 다 아는 아이는 영영 안 죽는다(2026-09-04 사용자 지적).
+    expect(TIMER.TMIN).toBeLessThanOrEqual(1.0);
+    const floorAtMin = Math.ceil((TIMER.T0 - TIMER.TMIN) / TIMER.K);
+    expect(floorAtMin).toBeLessThan(120);
   });
   it('게임이 그 식을 실제로 쓴다', () => {
     const g = newGame();
@@ -142,20 +152,21 @@ describe('타이머 식 [D6]', () => {
 });
 
 describe('갈래 수 [D7]', () => {
-  it('층 1~29 는 항상 2, 60+ 는 항상 3', () => {
+  it('경계 아래는 항상 2, 전면 구간부터는 항상 3', () => {
     const rng = makeRng(1);
-    for (const f of [1, 15, 29]) expect(branchesFor(f, rng)).toBe(2);
-    for (const f of [60, 120, 500]) expect(branchesFor(f, rng)).toBe(3);
+    for (const f of [1, BRANCH.THREE_WAY_FROM - 1]) expect(branchesFor(f, rng)).toBe(2);
+    for (const f of [BRANCH.THREE_WAY_FULL, 120, 500]) expect(branchesFor(f, rng)).toBe(3);
   });
-  it('층 30~59 는 3갈래 비율 50%±5%p (N=400 표본, 표본 미달이면 측정 무효)', () => {
+  it('섞이는 구간은 3갈래 비율 MIX_RATIO ±5%p (N=400 표본, 표본 미달이면 측정 무효)', () => {
     const rng = makeRng(99);
     const N = 400;
+    const span = BRANCH.THREE_WAY_FULL - BRANCH.THREE_WAY_FROM;
     let three = 0;
-    for (let i = 0; i < N; i++) three += branchesFor(30 + (i % 30), rng) === 3 ? 1 : 0;
+    for (let i = 0; i < N; i++) three += branchesFor(BRANCH.THREE_WAY_FROM + (i % span), rng) === 3 ? 1 : 0;
     expect(N).toBeGreaterThanOrEqual(400);
     const ratio = three / N;
-    expect(ratio).toBeGreaterThan(0.45);
-    expect(ratio).toBeLessThan(0.55);
+    expect(ratio).toBeGreaterThan(BRANCH.MIX_RATIO - 0.05);
+    expect(ratio).toBeLessThan(BRANCH.MIX_RATIO + 0.05);
   });
 });
 

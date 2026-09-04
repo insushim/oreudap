@@ -5,5 +5,21 @@
     "bytes": 24192102,
     "license": "self-generated",
     "source": "ACE-Step-1.5 via game-builder/tools/gen-bgm.sh"
+  },
+  {
+    "file": "bgm-tense.loop.wav",
+    "caption": "driving instrumental chase loop for a children's arcade game, staccato marimba and pulsing bass line, urgent but playful, steady groove, no vocals",
+    "bytes": 22656102,
+    "license": "self-generated",
+    "source": "ACE-Step-1.5 via game-builder/tools/gen-bgm.sh",
+    "role": "난이도 단계 BGM — 10층(tense)·25층(rush)에서 크로스페이드"
+  },
+  {
+    "file": "bgm-rush.loop.wav",
+    "caption": "frantic high-energy instrumental loop for an arcade climbing game, fast percussive synth arpeggio, pounding drums, breathless urgency, no vocals",
+    "bytes": 24192102,
+    "license": "self-generated",
+    "source": "ACE-Step-1.5 via game-builder/tools/gen-bgm.sh",
+    "role": "난이도 단계 BGM — 10층(tense)·25층(rush)에서 크로스페이드"
   }
 ]

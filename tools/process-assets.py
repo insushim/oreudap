@@ -130,12 +130,19 @@ def build(check=False):
             print('  · ' + p)
         return 1
 
+    # 판이 시작된 뒤에 받아 오는 오디오 키
+    LAZY_AUDIO = {'bgm-tense', 'bgm-rush'}
+
     # 오디오도 같은 매니페스트에 싣는다 — 로더·스모크 모수·크레딧이 전부 이 파일 하나를 읽는다.
     audio_dir = ROOT / 'public' / 'assets' / 'audio'
     for ogg in sorted(audio_dir.glob('*.ogg')):
         key = ogg.stem
         m4a = ogg.with_suffix('.m4a')
         entry = {'ogg': ogg.name, 'bytes': ogg.stat().st_size}
+        # 🔴 강도 BGM 은 첫 화면에 필요 없다 — preload 에 넣으면 두 곡 760KB 가
+        #    「첫 문제까지 전송량」예산(D25)에 그대로 얹힌다. 판 중에 받는다(src/ui/sound.js).
+        if key in LAZY_AUDIO:
+            entry['lazy'] = True
         if m4a.exists():
             entry['m4a'] = m4a.name
             entry['bytes'] += m4a.stat().st_size
@@ -151,6 +158,7 @@ def build(check=False):
 
     total = sum(v['bytes'] for v in manifest['images'].values())
     manifest['audioBytes'] = sum(v['bytes'] for v in manifest['audio'].values())
+    manifest['eagerAudioBytes'] = sum(v['bytes'] for v in manifest['audio'].values() if not v.get('lazy'))
     manifest['totalBytes'] = total
     text = json.dumps(manifest, ensure_ascii=False, indent=2) + '\n'
 

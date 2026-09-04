@@ -125,6 +125,11 @@ async function main() {
         return {
           w: r.width, h: r.height, left: r.left, top: r.top, right: r.right, bottom: r.bottom,
           fs: parseFloat(getComputedStyle(txt).fontSize),
+          // 🔴 «잘렸는가»를 직접 잰다. 예전엔 white-space:nowrap + ellipsis 라
+          //    「필요하다」가 «필요하…» 로 나왔고, 그러면 문제가 성립하지 않는다.
+          clipW: txt.scrollWidth - txt.clientWidth,
+          clipH: txt.scrollHeight - txt.clientHeight,
+          text: txt.textContent,
           text: txt.textContent.trim(),
           hit: !!(el && (el === c || c.contains(el))),
           clipped: txt.scrollWidth > txt.clientWidth + 1,
@@ -141,6 +146,9 @@ async function main() {
       if (c.h < 44) FAIL(`[${tag}] 선택지 ${i} 높이 ${c.h.toFixed(0)}px < 44px`);
       if (c.w < 44) FAIL(`[${tag}] 선택지 ${i} 너비 ${c.w.toFixed(0)}px < 44px`);
       if (c.fs < 28) FAIL(`[${tag}] 선택지 ${i} 글자 ${c.fs.toFixed(1)}px < 28px`);
+      if (c.clipW > 1 || c.clipH > 1) {
+        FAIL(`[${tag}] 선택지 «${c.text}» 가 상자에 잘렸다 (가로 ${c.clipW}px · 세로 ${c.clipH}px 넘침)`);
+      }
       if (!c.text) FAIL(`[${tag}] 선택지 ${i} 텍스트가 비었다`);
       if (c.clipped) FAIL(`[${tag}] 선택지 ${i} 텍스트가 잘린다 ("${c.text}")`);
       if (!c.hit) FAIL(`[${tag}] 선택지 ${i} 중심점이 눌리지 않는다 — 보이지만 못 누른다`);

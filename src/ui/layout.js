@@ -14,7 +14,8 @@ export function computeLayout(w, h) {
   const contentLeft = (w - contentW) / 2;
   const landscape = w > h;
 
-  const bandH = Math.max(CHOICE_MIN_H, Math.min(140, h * 0.185));
+  // 두 줄로 접히는 긴 뜻(「스케이트를 타다」)이 들어갈 여유를 둔다.
+  const bandH = Math.max(CHOICE_MIN_H, Math.min(152, h * 0.20));
   // 🔴 floorH = «한 층 높이» = 한 번의 도약 거리다. 이 값이 크면 계단이 아니라 뜀뛰기가 되고,
   //    무엇보다 캐릭터 «아래»에 지나온 층이 들어설 자리가 사라져 높이가 체감되지 않는다.
   //    작게 잡아 화면 아래쪽에 계단이 2~3개 쌓여 내려가도록 한다.
@@ -34,8 +35,10 @@ export function computeLayout(w, h) {
     // 🔴 캐릭터는 «한 층 안»에 들어가야 한다 — 크면 머리가 위 발판에 가려 파묻힌 것처럼 보인다.
     //    상한 셋의 뜻: 가로 비율 · 한 층 높이 · 화면 높이.
     charSize: Math.min(contentW * 0.26, floorH * 0.60, h * 0.145),
-    // 발판 띠는 선택지 폭보다 좁게 — 열이 넓으면 발판 스프라이트가 그만큼 두꺼워져 한 층을 넘는다.
-    bandW: Math.min(contentW, 440),
+    // 🔴 발판 띠 폭 = 선택지 열 폭의 원천. 좁히면 발판은 예뻐지지만 «한국어 뜻»이 안 들어간다.
+    //    3갈래에서 440px 면 한 열이 136px 이고, 「필요하다」가 40px 글자로 196px 라 잘렸다(실측).
+    //    발판 두께는 floorH 로 따로 제한하므로(PLAT_MAX_H) 넓혀도 계단은 두꺼워지지 않는다.
+    bandW: contentW,
     gap: contentW > 420 ? 16 : 10,
   };
 }

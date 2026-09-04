@@ -123,7 +123,7 @@ export class GameCore {
   _nextQuestion() {
     const events = [];
     const branches = branchesFor(this.floor + 1, this.rng);
-    this.question = this.source.next(branches);
+    this.question = this.source.next(branches, this.floor + 1);
     this.activeAt = this.t;
     this.timerMs = timerFor(this.floor + 1) * 1000;
     this.answered = false;

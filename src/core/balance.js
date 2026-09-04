@@ -2,10 +2,15 @@
 // 게임 코드·프로브·게이트·문서 재생성 스크립트가 전부 이 파일을 import 한다.
 // 🚫 다른 파일에서 이 수치를 다시 적지 말 것(L-070: 손계산 전사가 어긋난다).
 
+// 🔴 난이도의 정본. 2026-09-04 상향 — 사용자: 「너무 쉽다 · 탈락은 언제 하는겨」.
+//    이전 값(T0 3.2 · K 0.011 · TMIN 1.0)은 하한에 **200층에서야** 닿아서
+//    다 아는 아이는 사실상 죽지 않았다 — 엔드리스인데 «실력 천장»이 없었다.
+//    지금은 90층 부근에서 하한에 닿고, 그 하한이 사람 반응시간(평균 0.85초) 언저리라
+//    아무리 잘 알아도 언젠가 손이 못 따라간다. 그게 「한 판 더」를 만든다.
 export const TIMER = {
-  T0: 3.2,      // 층 1 기준 상한(초)
-  K: 0.011,     // 층당 감소(초)
-  TMIN: 1.0,    // 바닥(초)
+  T0: 2.6,      // 층 1 기준 상한(초)
+  K: 0.021,     // 층당 감소(초)
+  TMIN: 0.85,   // 바닥(초) — 반응시간 평균과 같은 자리
 };
 
 /** 층 n 의 제한시간(초). GDD §1-4-1 */
@@ -19,11 +24,30 @@ export const HEART = {
   STREAK_HEAL: 10, // 스트릭 10마다 하트 +1 (최대치 초과분은 버림)
 };
 
+// 2갈래는 찍어서 50% 다. 그 구간이 길면 «공부 안 해도 오르는» 구간이 길어진다.
 export const BRANCH = {
-  THREE_WAY_FROM: 30,  // 이 층부터 3갈래가 50% 확률로 등장
-  THREE_WAY_FULL: 60,  // 이 층부터 항상 3갈래
+  THREE_WAY_FROM: 8,   // 이 층부터 3갈래가 50% 확률로 등장
+  THREE_WAY_FULL: 26,  // 이 층부터 항상 3갈래
   MIX_RATIO: 0.5,
 };
+
+// 🔴 난이도 계단의 «층 경계» 정본. 문항 등급(questions.maxTierFor)과 BGM 강도(ui/sound.js)가
+//    같은 배열을 읽는다 — 음악이 세지는 층과 문제가 어려워지는 층이 어긋나면
+//    아이는 「왜 갑자기 어렵지」를 귀로 예고받지 못한다(둘을 따로 적어 두면 반드시 어긋난다, L-070).
+export const TIER_FLOORS = [10, 25];   // [등급2 개방층, 등급3 개방층]
+
+/** 층 n 이 속한 강도 단계(0·1·2) */
+export function tierIndexFor(floor) {
+  let i = 0;
+  for (const f of TIER_FLOORS) if (floor >= f) i += 1;
+  return i;
+}
+
+/** 층 n 이 속한 단계가 «시작된» 층 — BGM 재생속도 램프의 기준점 */
+export function tierStartFor(floor) {
+  const i = tierIndexFor(floor);
+  return i === 0 ? 1 : TIER_FLOORS[i - 1];
+}
 
 /** 층 n 의 갈래 수. GDD §1-3-3 */
 export function branchesFor(floor, rnd) {

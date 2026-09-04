@@ -86,6 +86,7 @@ export class WorldScene extends Phaser.Scene {
     const audio = this.manifest.audio || {};
     for (const [key, meta] of Object.entries(audio)) {
       if (this.cache.audio.exists(key)) continue;
+      if (meta.lazy) continue;   // 강도 BGM 은 판 중에 받는다(main.js 주석)
       const urls = [];
       if (meta.ogg) urls.push(`./assets/audio/${meta.ogg}`);
       if (meta.m4a) urls.push(`./assets/audio/${meta.m4a}`);

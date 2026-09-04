@@ -6,7 +6,7 @@ import { PersistentNotes } from './core/srs.js';
 import { SUBJECTS, describeId } from './core/questions.js';
 import { load, save, emptySave } from './core/storage.js';
 import { applyRun, buy, equip, todayMissions } from './core/economy.js';
-import { SHOP, HEART, SRS, TIMING } from './core/balance.js';
+import { SHOP, HEART, SRS, TIMING, tierIndexFor, tierStartFor } from './core/balance.js';
 import { computeLayout, columns } from './ui/layout.js';
 import { Sound } from './ui/sound.js';
 import { makeRng } from './core/rng.js';
@@ -244,6 +244,7 @@ export class App {
       this.scene.setTheme(this.data.theme);
     }
     this.sound.unlock();
+    this.sound.resetIntensity();
     this.sound.startBgm();
     this.core.start();
     this.onQuestion();
@@ -336,6 +337,8 @@ export class App {
     const fb = $('#feedback');
     if (res.type === 'correct') {
       this.sound.play('correct');
+      // 계단이 오를수록 음악이 조여든다 — 층 경계는 코어(balance)가 정하고 UI 는 받아 쓴다.
+      this.sound.setIntensity(res.floor, tierIndexFor(res.floor), tierStartFor(res.floor));
       if (this.scene) this.scene.jumpTo(q.answerIndex, res.floor);
       this.markChoice(q.answerIndex, 'is-correct');
       if (res.bonus) {
@@ -385,8 +388,13 @@ export class App {
     this.clearChoices();
     const box = $('#choices');
     const cols = columns(this.layout, q.choices.length);
+    const longest = Math.max(...q.choices.map((t) => String(t).length));
+    const sizeClass = longest >= 7 ? 'len-l' : longest >= 4 ? 'len-m' : '';
     q.choices.forEach((text, i) => {
-      const b = el('button', 'choice');
+      // 🔴 뜻 길이에 따라 글자 등급을 준다 — 자르지 않고 «작게 해서 넣는다».
+      //    문항 폭은 «가장 긴 선택지»가 정한다: 하나만 길어도 셋 다 같은 등급을 써야
+      //    크기가 들쭉날쭉해 보이지 않는다.
+      const b = el('button', `choice ${sizeClass}`);
       b.type = 'button';
       b.dataset.index = String(i);
       b.setAttribute('aria-label', `${i + 1}번 선택지 ${text}`);
