@@ -5,3 +5,4 @@ qa/answer-sample.json
 tools/*.log
 .DS_Store
 .vercel
+qa/live.png
