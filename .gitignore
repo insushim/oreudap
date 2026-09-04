@@ -6,3 +6,5 @@ tools/*.log
 .DS_Store
 .vercel
 qa/live.png
+
+qa/live.png
