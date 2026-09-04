@@ -1,0 +1,10 @@
+{
+  "name": "oreudap-rank",
+  "main": "src/index.js",
+  "compatibility_date": "2026-04-22",
+  // 🔴 Durable Object 가 아니라 KV 다 — 이 계정의 DO 무료 한도는 다른 프로젝트(리로드 아레나)가
+  //    이미 쓰고 있고, D1 은 데이터베이스 개수 상한에 걸렸다(2026-09-04 실측).
+  //    판 전체를 키 하나에 담으므로 «제출 1회 = 쓰기 1회» 다(무료 한도 하루 1000회).
+  "kv_namespaces": [{ "binding": "RANK", "id": "ce59a7c2c03b486299408a0a67a13d5c" }],
+  "observability": { "enabled": true }
+}

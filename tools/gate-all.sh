@@ -31,6 +31,7 @@ run "빌드"                            npx vite build
 run "2D 스모크 (D17·D18·D19·D22)"     node "$HOME/.claude/skills/game-builder/tools/phaser-smoke.mjs" --dir dist --page index.html --port 8181 --steps 600 --scene-cycles 5
 run "시각 QA (D15·D16)"               node tools/qa-visual.mjs --dir dist
 run "플레이 QA (D13·D14·D21·D22)"     node tools/qa-play.mjs --dir dist
+run "올라가는 느낌 (D28)"             node tools/qa-climb.mjs --dir dist
 run "성능·번들 (D25)"                 node tools/qa-perf.mjs --dir dist
 
 echo ""

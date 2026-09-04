@@ -8,6 +8,7 @@ import path from 'node:path';
 import { WORDS_G34 } from '../src/data/words-g34.js';
 import { WORDS_G56 } from '../src/data/words-g56.js';
 import { COMMON_ERRORS } from '../src/data/gugudan-common-errors.js';
+import { MIN_WORDS_PER_BAND } from '../src/core/balance.js';
 import { buildBank } from '../src/core/questions.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -58,11 +59,14 @@ const POS = new Set(['n', 'v', 'a', 'num']);
 {
   const allWords = new Set();
   for (const [name, pool] of BANDS) {
-    if (pool.length !== 160) FAIL(`${name}: ${pool.length}개 — 160개여야 한다`);
+    // 🔴 정확한 개수는 ④에서 출처 원장과 1:1 대조한다. 여기서는 «반복 체감» 하한만 본다 —
+    //    한 판에 같은 단어가 금방 돌아오면 학습이 아니라 암기 게임이 된다.
+    if (pool.length < MIN_WORDS_PER_BAND) FAIL(`${name}: ${pool.length}개 — ${MIN_WORDS_PER_BAND}개 미만이면 한 판 안에 반복된다`);
     const seen = new Set();
     const meanings = new Set();
     for (const e of pool) {
-      if (!e.w || !/^[a-z][a-z ]*$/.test(e.w)) FAIL(`${name}: 영단어 표기 오류 "${e.w}"`);
+      // 요일·월·언어명 같은 고유명사는 대문자로 시작하는 것이 «정상»이다.
+      if (!e.w || !/^[A-Za-z][a-z' -]*$/.test(e.w)) FAIL(`${name}: 영단어 표기 오류 "${e.w}"`);
       if (!e.k || !e.k.trim()) FAIL(`${name}: 뜻이 비었다 "${e.w}"`);
       if (!POS.has(e.pos)) FAIL(`${name}: 품사 값 오류 "${e.w}" → "${e.pos}"`);
       if (seen.has(e.w)) FAIL(`${name}: 중복 단어 "${e.w}"`);

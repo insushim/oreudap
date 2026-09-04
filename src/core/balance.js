@@ -93,6 +93,10 @@ export const DECK = {
   RESHUFFLE_TRIES: 20,
 };
 
+/** 밴드당 최소 낱말 수 — 이보다 적으면 한 판 안에 같은 단어가 돌아와 «암기 게임»이 된다.
+ *  🔴 이 값을 적는 곳은 여기 하나뿐이다. 테스트도 데이터 게이트도 여기를 읽는다. */
+export const MIN_WORDS_PER_BAND = 500;
+
 export const SAVE = {
   KEY: 'oreudap:progress',
   VERSION: 2,

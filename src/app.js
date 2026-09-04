@@ -273,14 +273,18 @@ export class App {
     const fb = $('#feedback');
     if (res.type === 'correct') {
       this.sound.play('correct');
-      if (this.scene) this.scene.jumpTo(q.answerIndex);
+      if (this.scene) this.scene.jumpTo(q.answerIndex, res.floor);
       this.markChoice(q.answerIndex, 'is-correct');
       if (res.bonus) {
         this.sound.play('streak');
         if (this.scene) this.scene.celebrate();
         this.flashStreak(this.core.streak, res.healed);
       }
-      if (res.boxState === 'graduated') this.say(fb, '🎓 이제 완전히 내 거!', 'good');
+      // 10층마다 «금 발판» — 아래로 흘러가는 계단이 그대로 고도계가 된다.
+      if (res.floor % 10 === 0) {
+        this.sound.play('coin');
+        this.say(fb, `🏁 ${res.floor}층 돌파!`, 'good');
+      } else if (res.boxState === 'graduated') this.say(fb, '🎓 이제 완전히 내 거!', 'good');
       else if (res.graduated === 'graduated') this.say(fb, '👍 오늘은 이 문제 통과!', 'good');
     } else {
       this.sound.play(res.type === 'timeout' ? 'timeout' : 'wrong');

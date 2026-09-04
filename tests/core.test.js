@@ -11,6 +11,7 @@ import { timerFor, branchesFor, TIMING, HEART, COIN, SRS, SAVE } from '../src/co
 import { makeRng } from '../src/core/rng.js';
 import { load, save, migrate, emptySave, sanitize } from '../src/core/storage.js';
 import { applyRun, buy, equip, todayMissions } from '../src/core/economy.js';
+import { MIN_WORDS_PER_BAND } from '../src/core/balance.js';
 import { WORDS_G34 } from '../src/data/words-g34.js';
 import { WORDS_G56 } from '../src/data/words-g56.js';
 import { COMMON_ERRORS } from '../src/data/gugudan-common-errors.js';
@@ -217,7 +218,9 @@ describe('오답 생성 규칙 [D9]', () => {
     }
   });
 
-  it('영단어 오답은 같은 밴드·같은 품사다 (전수)', () => {
+  // 🔴 품사는 «선호»지 «조건»이 아니다 — 품사군 인원이 모자라면 선택지를 비우느니
+  //    밴드 전체로 폴백한다. 그래서 단언은 «같은 품사가 남아 있는 한 같은 품사»다.
+  it('영단어 오답은 같은 밴드에서 나오고, 여유가 있으면 같은 품사다 (전수)', () => {
     const rng = makeRng(11);
     for (const [pool, name] of [[WORDS_G34, 'g34'], [WORDS_G56, 'g56']]) {
       let checked = 0;
@@ -225,8 +228,9 @@ describe('오답 생성 규칙 [D9]', () => {
         for (const dir of ['w2k', 'k2w']) {
           const ds = wordDistractors(item, pool, dir, 2, rng);
           expect(ds.length, `${name}/${item.w}/${dir}`).toBe(2);
+          const samePosPool = pool.filter((e) => e.pos === item.pos && e.w !== item.w).length;
           for (const d of ds) {
-            expect(d.pos).toBe(item.pos);
+            if (samePosPool >= 2) expect(d.pos, `${name}/${item.w}`).toBe(item.pos);
             expect(pool).toContain(d);
             expect(d.w).not.toBe(item.w);
           }
@@ -516,9 +520,12 @@ describe('결정론', () => {
     expect(seq(42)).toEqual(seq(42));
     expect(seq(42)).not.toEqual(seq(43));
   });
-  it('문항 은행 크기 — 구구단 72, 영단어 밴드당 320(160×2방향)', () => {
+  it('문항 은행 크기 — 구구단 72, 영단어 밴드당 «단어수×2방향»', () => {
     expect(buildBank('gugudan').length).toBe(72);
-    expect(buildBank('words34').length).toBe(320);
-    expect(buildBank('words56').length).toBe(320);
+    expect(buildBank('words34').length).toBe(WORDS_G34.length * 2);
+    expect(buildBank('words56').length).toBe(WORDS_G56.length * 2);
+    // 반복 체감을 좌우하는 «절대량» — 한 판에 같은 단어가 금방 돌아오면 안 된다
+    expect(WORDS_G34.length).toBeGreaterThanOrEqual(MIN_WORDS_PER_BAND);
+    expect(WORDS_G56.length).toBeGreaterThanOrEqual(MIN_WORDS_PER_BAND);
   });
 });

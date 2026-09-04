@@ -5,6 +5,7 @@
   "type": "module",
   "description": "오르답 — 정답을 밟고 오르는 무한 학습 계단",
   "scripts": {
+    "words:import": "node tools/import-words.mjs",
     "dev": "vite --port 5199 --strictPort",
     "build": "vite build",
     "preview": "vite preview --port 5198 --strictPort",

@@ -77,8 +77,11 @@ export function wordDistractors(item, pool, dir, n, rng) {
   const answerText = item[field];
   const firstDiff = samePos.filter((e) => e[field][0] !== answerText[0]);
   const rest = samePos.filter((e) => e[field][0] === answerText[0]);
+  // 🔴 마지막 티어는 «밴드 전체»다 — 품사 태그가 비거나 희귀하면 같은 품사만으로는
+  //    오답이 모자라 선택지가 비어 버린다. 품사는 «선호»지 «조건»이 아니다.
+  const anyPos = pool.filter((e) => e.w !== item.w);
   const out = [];
-  for (const tier of [firstDiff, rest]) {
+  for (const tier of [firstDiff, rest, anyPos]) {
     for (const e of shuffle(rng, tier.slice())) {
       if (out.length >= n) break;
       if (e[field] === answerText) continue;

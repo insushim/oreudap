@@ -13,17 +13,29 @@ export function computeLayout(w, h) {
   const contentW = Math.max(MIN_CONTENT, Math.min(w - 24, MAX_CONTENT_W));
   const contentLeft = (w - contentW) / 2;
   const landscape = w > h;
-  // 가로 화면에서는 카드/발판 밴드를 위로 당겨 하단 여백을 확보한다.
-  const bandRatio = landscape ? 0.50 : 0.455;
-  const bandH = Math.max(CHOICE_MIN_H, Math.min(150, h * (landscape ? 0.24 : 0.155)));
+
+  const bandH = Math.max(CHOICE_MIN_H, Math.min(140, h * 0.185));
+  // 🔴 floorH = «한 층 높이» = 한 번의 도약 거리다. 이 값이 크면 계단이 아니라 뜀뛰기가 되고,
+  //    무엇보다 캐릭터 «아래»에 지나온 층이 들어설 자리가 사라져 높이가 체감되지 않는다.
+  //    작게 잡아 화면 아래쪽에 계단이 2~3개 쌓여 내려가도록 한다.
+  const floorH = Math.max(bandH * 0.62, h * 0.185);
+
+  const cardTop = Math.max(40, h * 0.055);
+  const cardH = Math.max(76, Math.min(140, h * (landscape ? 0.185 : 0.15)));
+  // 발판 밴드는 카드 바로 아래에 붙이고, 캐릭터는 딱 한 층 아래에 둔다.
+  const bandY = Math.max(cardTop + cardH + bandH * 0.60, h * 0.40);
+  const charY = bandY + floorH;
+
   return {
     w, h, landscape, contentW, contentLeft,
-    cardTop: Math.max(56, h * (landscape ? 0.10 : 0.115)),
-    cardH: Math.max(84, Math.min(150, h * (landscape ? 0.20 : 0.135))),
-    bandY: h * bandRatio,
-    bandH,
-    charY: h * (landscape ? 0.80 : 0.735),
-    charSize: Math.min(contentW * 0.34, h * 0.16),
+    cardTop, cardH,
+    bandY, bandH, floorH,
+    charY,
+    // 🔴 캐릭터는 «한 층 안»에 들어가야 한다 — 크면 머리가 위 발판에 가려 파묻힌 것처럼 보인다.
+    //    상한 셋의 뜻: 가로 비율 · 한 층 높이 · 화면 높이.
+    charSize: Math.min(contentW * 0.26, floorH * 0.60, h * 0.145),
+    // 발판 띠는 선택지 폭보다 좁게 — 열이 넓으면 발판 스프라이트가 그만큼 두꺼워져 한 층을 넘는다.
+    bandW: Math.min(contentW, 440),
     gap: contentW > 420 ? 16 : 10,
   };
 }
@@ -33,11 +45,13 @@ export function computeLayout(w, h) {
  * @returns {{x:number, y:number, w:number, h:number, cx:number, cy:number}[]}
  */
 export function columns(layout, k) {
-  const { contentLeft, contentW, bandY, bandH, gap } = layout;
-  const colW = (contentW - gap * (k - 1)) / k;
+  const { contentW, bandY, bandH, gap, w } = layout;
+  const bandW = layout.bandW || contentW;
+  const left = (w - bandW) / 2;
+  const colW = (bandW - gap * (k - 1)) / k;
   const out = [];
   for (let i = 0; i < k; i++) {
-    const x = contentLeft + i * (colW + gap);
+    const x = left + i * (colW + gap);
     out.push({ x, y: bandY - bandH / 2, w: colW, h: bandH, cx: x + colW / 2, cy: bandY });
   }
   return out;
