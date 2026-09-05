@@ -20,6 +20,7 @@ const N = Number(args.N ?? 300);
 const MU = Number(args.MU ?? 0.85);
 const SD = Number(args.SD ?? 0.20);
 const SUBJECT = args.subject ?? 'gugudan';
+const MODE = args.mode ?? 'classic';
 const STEP = 10; // ms 시뮬 스텝
 const MAX_MS = 20 * 60 * 1000;
 
@@ -35,8 +36,8 @@ function gauss(rng) {
  * @param {number} o.seed 공통난수 시드
  * @param {'know'|'mash'|'history'} [o.policy]
  */
-function runBot({ p, seed, policy = 'know', mu = MU, sd = SD }) {
-  const core = new GameCore({ seed, subject: SUBJECT, notes: new PersistentNotes(), now: () => 1_700_000_000_000 });
+function runBot({ p, seed, policy = 'know', mu = MU, sd = SD, mode = MODE }) {
+  const core = new GameCore({ seed, subject: SUBJECT, mode, notes: new PersistentNotes(), now: () => 1_700_000_000_000 });
   const botRng = makeRng(seed * 2654435761 + 12345); // 봇 결정 전용(세계 RNG 와 분리)
   core.start();
 
@@ -90,6 +91,8 @@ function runBot({ p, seed, policy = 'know', mu = MU, sd = SD }) {
 
   return {
     floor: core.floor,
+    cause: core.lastResult && core.lastResult.type === 'fall' ? core.lastResult.cause : 'wrong',
+    seconds: core.t / 1000,
     asked: core.stats.asked,
     correct: core.stats.correct,
     timeouts: core.stats.timeouts,

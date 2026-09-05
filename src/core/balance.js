@@ -18,6 +18,76 @@ export function timerFor(floor) {
   return Math.max(TIMER.TMIN, TIMER.T0 - TIMER.K * floor);
 }
 
+// 🔴 모드 정본. 「무한의 계단처럼 아슬아슬하게」(사용자, 2026-09-05)에 대한 답이다.
+//    무한의 계단의 긴장 장치는 «문항 타이머»가 아니라 **계속 줄어드는 기력 게이지** 하나다.
+//    그래서 아슬아슬 모드는 문항 타이머를 아예 끄고 게이지만 돌린다 — 두 시계를 같이 돌리면
+//    아이는 무엇 때문에 죽었는지 모른다(클래식을 그냥 어렵게 한 것과 다른 «구조»여야 모드다).
+//
+//  · timed   문항마다 제한시간이 있는가(timerFor)
+//  · hearts  목숨 개수. 0 이면 하트를 쓰지 않는다(기력이 곧 목숨)
+//  · stamina 기력 게이지를 쓰는가
+//  · runMs   판 전체 제한시간(ms). 0 이면 무제한
+export const MODES = {
+  classic: {
+    label: '무한 오르기', hint: '하트 3개 · 문항마다 제한시간',
+    timed: true, hearts: 3, stamina: false, runMs: 0,
+  },
+  thrill: {
+    label: '아슬아슬', hint: '기력이 계속 줄어든다 · 멈추면 떨어진다',
+    timed: false, hearts: 0, stamina: true, runMs: 0,
+  },
+  sprint: {
+    label: '60초 질주', hint: '1분 안에 몇 층까지',
+    // 🔴 질주 모드의 하트는 5개다. 3개면 대부분 «시간이 아니라 하트»로 끝나 60초라는 이름이
+    //    거짓말이 된다(실측: p=0.5 에서 시간 종료 0%). 모드는 죽는 이유가 달라야 모드다.
+    timed: true, hearts: 5, stamina: false, runMs: 60000,
+  },
+};
+export const DEFAULT_MODE = 'classic';
+
+/** 기력 게이지 — 0~1. 아슬아슬 모드의 «유일한» 생명선이다.
+ *  🔴 수치의 뜻: 층이 오를수록 «가만히 있는 값»이 비싸진다. 정답 회복은 고정이고
+ *     소모만 늘어나므로, 실력이 그대로면 언젠가 반드시 바닥난다 — 그게 엔드리스의 끝이다. */
+export const STAMINA = {
+  START: 1,
+  DRAIN0: 0.135,      // 층 1 에서 초당 소모
+  DRAIN_K: 0.0030,    // 층당 추가 소모(초당)
+  DRAIN_MAX: 0.62,    // 소모 상한 — 이 위로는 사람 손이 못 따라간다
+  REFILL: 0.235,      // 정답 회복(고정)
+  QUICK_BONUS: 0.075, // 빨리 답할수록 얹어 주는 회복(최대치)
+  QUICK_MS: 1600,     // 이 시간 안에 답하면 보너스가 붙기 시작한다
+  WRONG: 0.30,        // 오답 감소
+  LOW: 0.28,          // 이 아래면 «아슬아슬» 연출이 켜진다
+  // 🔴 바닥에 가까울수록 회복이 커진다. 이게 없으면 게이지가 «넉넉하다 → 즉사» 두 상태뿐이라
+  //    정작 아슬아슬한 구간을 지나가지 않는다(실측: 완벽한 봇이 판의 5%만 위험구간에 머물렀다).
+  //    붙잡고 버티는 구간을 «길게» 만드는 것이 이 모드의 전부다.
+  COMEBACK: 0.35,     // 회복 배수 = 1 + COMEBACK × (1 - 기력)
+  // 🔴 «천장»이 층마다 내려간다. 이게 아슬아슬함의 진짜 장치다 —
+  //    컴백 회복만 키웠더니 바닥에서 단번에 튀어 올라 위험구간을 오히려 «덜» 지나갔다(3%).
+  //    천장이 내려오면 높은 층에서는 게이지가 물리적으로 위험구간을 벗어날 수 없다.
+  //    높이 오를수록 숨이 차는 것 — 구조가 곧 연출이다.
+  CAP0: 1,
+  CAP_K: 0.0200,      // 층당 천장 하락
+  CAP_MIN: 0.42,
+};
+
+/** 층 n 에서 기력이 «찰 수 있는» 최대치 */
+export function capFor(floor) {
+  return Math.max(STAMINA.CAP_MIN, STAMINA.CAP0 - STAMINA.CAP_K * floor);
+}
+
+/** 층 n 에서 초당 기력 소모 */
+export function drainFor(floor) {
+  return Math.min(STAMINA.DRAIN_MAX, STAMINA.DRAIN0 + STAMINA.DRAIN_K * floor);
+}
+
+/** 정답 회복량 — 빨리 답하면 더 준다(생각하는 시간이 곧 기력이다) */
+export function refillFor(elapsedMs, stamina = 1) {
+  const q = Math.max(0, 1 - elapsedMs / STAMINA.QUICK_MS);
+  const base = STAMINA.REFILL + STAMINA.QUICK_BONUS * q;
+  return base * (1 + STAMINA.COMEBACK * (1 - Math.max(0, Math.min(1, stamina))));
+}
+
 export const HEART = {
   START: 3,
   MAX: 3,
@@ -123,7 +193,7 @@ export const MIN_WORDS_PER_BAND = 500;
 
 export const SAVE = {
   KEY: 'oreudap:progress',
-  VERSION: 2,
+  VERSION: 3,
 };
 
 /** 성능 예산 — 등급형(L-093: vsync 스냅 때문에 16.7 로 적으면 영구 미달) */

@@ -7,7 +7,7 @@ import { PersistentNotes, SessionQueue, dayKey } from '../src/core/srs.js';
 import { PositionDeck, hasRun } from '../src/core/positionDeck.js';
 import { gugudanDistractors, gugudanCandidates, wordDistractors } from '../src/core/distractors.js';
 import { buildBank, QuestionSource } from '../src/core/questions.js';
-import { timerFor, branchesFor, TIMING, HEART, COIN, SRS, SAVE, TIMER, BRANCH } from '../src/core/balance.js';
+import { timerFor, branchesFor, TIMING, HEART, COIN, SRS, SAVE, TIMER, BRANCH, MODES, STAMINA, drainFor, refillFor, capFor } from '../src/core/balance.js';
 import { makeRng } from '../src/core/rng.js';
 import { load, save, migrate, emptySave, sanitize } from '../src/core/storage.js';
 import { applyRun, buy, equip, todayMissions } from '../src/core/economy.js';
@@ -338,12 +338,25 @@ describe('세이브 [D12]', () => {
     expect(JSON.parse(st.getItem('oreudap:progress')).version).toBe(SAVE.VERSION);
     expect(load(st).coins).toBe(42);
   });
-  it('v1 → v2 마이그레이션', () => {
+  it('v1 → 현행 마이그레이션 (체인 전체)', () => {
     const v1 = { coins: 10, skin: 'fox', ownedSkins: ['fox'], best: 33, notes: {} };
     const out = migrate(1, v1);
-    expect(out.best).toEqual({ gugudan: 33 });
+    // v1 의 숫자 best 는 v2 에서 { gugudan } 이 되고, v3 에서 «과목:모드» 로 갈린다.
+    expect(out.best).toEqual({ 'gugudan:classic': 33 });
     expect(out.ownedThemes).toEqual(['dawn']);
     expect(out.settings.sound).toBe(true);
+    expect(out.mode).toBe('classic');
+  });
+  it('v2 → v3: 기록이 모드별로 갈리고 기존 값은 클래식으로 간다', () => {
+    // 🔴 모드마다 층수의 뜻이 다르다 — 옮기지 않으면 60초 질주 기록과 무한 기록이 한 칸에 섞인다.
+    const v2 = { coins: 7, best: { gugudan: 40, words34: 12 }, notes: {} };
+    const out = migrate(2, v2);
+    expect(out.best).toEqual({ 'gugudan:classic': 40, 'words34:classic': 12 });
+    expect(out.coins).toBe(7);
+  });
+  it('낯선 모드 문자열은 클래식으로 떨어진다(저장소는 신뢰 경계 밖)', () => {
+    expect(sanitize({ mode: '../../etc' }).mode).toBe('classic');
+    expect(sanitize({ mode: 'thrill' }).mode).toBe('thrill');
   });
   it('깨진 저장·차단된 저장소에서 빈 세이브로 떨어진다', () => {
     const bad = { getItem: () => '{"nope"', setItem: () => {}, removeItem: () => {} };
@@ -538,5 +551,100 @@ describe('결정론', () => {
     // 반복 체감을 좌우하는 «절대량» — 한 판에 같은 단어가 금방 돌아오면 안 된다
     expect(WORDS_G34.length).toBeGreaterThanOrEqual(MIN_WORDS_PER_BAND);
     expect(WORDS_G56.length).toBeGreaterThanOrEqual(MIN_WORDS_PER_BAND);
+  });
+});
+
+// ── 모드 (D33) ────────────────────────────────────────────
+describe('모드', () => {
+  const mk = (mode) => new GameCore({ seed: 7, subject: 'gugudan', mode, notes: new PersistentNotes(), now: () => 1_700_000_000_000 });
+
+  it('아슬아슬 모드에는 문항 타이머가 없다 — 시계가 둘이면 왜 죽었는지 알 수 없다', () => {
+    const c = mk('thrill');
+    c.start();
+    expect(c.timerMs).toBe(0);
+    expect(c.timeLeftMs).toBe(0);
+    // 오래 가만히 둬도 «타임아웃»으로는 죽지 않는다(기력으로만 죽는다)
+    c.stamina = 1;
+    c.advance(5000);
+    expect(c.stats.timeouts).toBe(0);
+  });
+
+  it('기력은 국면과 무관하게 줄고, 0 이 되면 그 자리에서 끝난다', () => {
+    const c = mk('thrill');
+    c.start();
+    const before = c.stamina;
+    c.advance(1000);
+    expect(c.stamina).toBeLessThan(before);
+    c.stamina = 0.001;
+    const ev = c.advance(100);
+    expect(ev.some((e) => e.type === 'gameover' && e.cause === 'stamina')).toBe(true);
+    expect(c.phase).toBe(PHASE.OVER);
+  });
+
+  it('추락으로 끝난 판은 오답으로 세지 않는다 — 답하지 않은 문항이다', () => {
+    const c = mk('thrill');
+    c.start();
+    const wrongBefore = c.stats.wrong;
+    c.stamina = 0.0001;
+    c.advance(50);
+    expect(c.stats.wrong).toBe(wrongBefore);
+  });
+
+  it('정답은 기력을 채우되 «그 층의 천장»을 넘지 못한다', () => {
+    const c = mk('thrill');
+    c.start();
+    c.floor = 60;
+    c.stamina = 0.4;
+    c.input(c.question.answerIndex);
+    expect(c.stamina).toBeLessThanOrEqual(capFor(c.floor) + 1e-9);
+    expect(capFor(60)).toBeLessThan(1);
+  });
+
+  it('천장은 층이 오를수록 내려가고 바닥이 있다', () => {
+    // 단조 감소 + 바닥. 🔴 «어느 층에서» 바닥에 닿는지는 밸런스라 수치로 박지 않는다 —
+    //    대신 성질만 잰다(29층 근처에서 닿는다는 사실은 probe-modes 가 재고 문서가 적는다).
+    for (let f = 1; f < 80; f++) expect(capFor(f + 1)).toBeLessThanOrEqual(capFor(f));
+    expect(capFor(1)).toBeGreaterThan(STAMINA.CAP_MIN);
+    expect(capFor(10_000)).toBe(STAMINA.CAP_MIN);
+  });
+
+  it('소모는 층에 따라 늘고 상한이 있다', () => {
+    expect(drainFor(1)).toBeLessThan(drainFor(50));
+    expect(drainFor(10_000)).toBe(STAMINA.DRAIN_MAX);
+  });
+
+  it('빨리 답할수록·바닥에 가까울수록 더 회복한다', () => {
+    expect(refillFor(0, 1)).toBeGreaterThan(refillFor(3000, 1));
+    expect(refillFor(0, 0.1)).toBeGreaterThan(refillFor(0, 1));
+  });
+
+  it('아슬아슬 모드는 하트를 깎지 않는다 — 생명선은 게이지 하나다', () => {
+    const c = mk('thrill');
+    c.start();
+    const h = c.hearts;
+    c.input((c.question.answerIndex + 1) % c.question.choices.length);
+    expect(c.hearts).toBe(h);
+    expect(c.stamina).toBeLessThan(STAMINA.START);
+  });
+
+  it('60초 질주는 시간이 다 되면 끝난다', () => {
+    const c = mk('sprint');
+    c.start();
+    expect(c.runEndsAt).toBe(MODES.sprint.runMs);
+    const ev = c.advance(MODES.sprint.runMs + 10);
+    expect(ev.some((e) => e.type === 'gameover' && e.cause === 'time')).toBe(true);
+  });
+
+  it('클래식은 기력·판 시계를 쓰지 않는다(회귀 방지)', () => {
+    const c = mk('classic');
+    c.start();
+    expect(c.stamina).toBe(null);
+    expect(c.runEndsAt).toBe(0);
+    expect(c.timerMs).toBeGreaterThan(0);
+  });
+
+  it('낯선 모드 이름은 클래식으로 떨어진다', () => {
+    const c = new GameCore({ seed: 1, subject: 'gugudan', mode: 'nope', notes: new PersistentNotes() });
+    expect(c.mode).toBe('classic');
   });
 });

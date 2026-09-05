@@ -67,14 +67,24 @@ export async function fetchBoard(n = 10, fetchFn = fetch) {
  * 기록 올리기. 오늘 이미 올린 내 최고보다 낮으면 «보내지 않는다» —
  * 서버 쓰기를 아끼고(무료 한도), 판도 같은 아이로 도배되지 않는다.
  */
+/**
+ * @param {string} subject 'gugudan' | 'words34' | 'words56'
+ * @param {number} floor
+ * @param {object} [opts] { mode }
+ * 🔴 과목과 모드를 «따로» 보낸다. 합쳐 보내면 아직 옛 워커가 도는 동안 그 값이 화이트리스트에
+ *    없어 첫 과목(구구단)으로 떨어진다 — 영단어 기록이 구구단 표에 실린다.
+ *    나눠 보내면 옛 워커는 모드를 무시하고 과목만 제대로 쓴다(배포 순서에 안 물린다).
+ */
 export async function submitScore(subject, floor, opts = {}) {
   const now = opts.now || Date.now();
   const fetchFn = opts.fetch || fetch;
   if (!(floor > 0)) return { skipped: 'zero' };
+  const mode = opts.mode || 'classic';
+  const key = `${subject}:${mode}`;
   const best = sentBest(now);
-  if ((best[subject] || 0) >= floor) return { skipped: 'notbest' };
+  if ((best[key] || 0) >= floor) return { skipped: 'notbest' };
 
-  const body = { n: displayNick(opts.nick), s: floor, sub: subject };
+  const body = { n: displayNick(opts.nick), s: floor, sub: subject, m: mode };
   const r = await fetchFn(RANK_API, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
@@ -82,7 +92,7 @@ export async function submitScore(subject, floor, opts = {}) {
   if (out.ok) {
     try {
       const s = ls();
-      if (s) s.setItem(SENT_KEY, JSON.stringify({ day: todayKey(now), best: { ...best, [subject]: floor } }));
+      if (s) s.setItem(SENT_KEY, JSON.stringify({ day: todayKey(now), best: { ...best, [key]: floor } }));
     } catch { /* 무시 */ }
   }
   return out;

@@ -66,7 +66,12 @@ async function main() {
 
   const errors = [];
   const requests = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    // 어느 리소스가 문제인지까지 적는다 — 「ERR_CONNECTION_CLOSED」만으로는 원인을 못 찾는다.
+    const loc = m.location && m.location();
+    errors.push(loc && loc.url ? `${m.text()} @ ${loc.url}` : m.text());
+  });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('request', (r) => requests.push({ url: r.url(), method: r.method(), type: r.resourceType(), post: r.postData() }));
 
@@ -229,12 +234,27 @@ async function main() {
   if (audio.report.failed.length) FAIL(`오디오 실패 ${audio.report.failed.length}건: ${audio.report.failed.slice(0, 2).join(' | ')}`);
 
   // ── D14: 봇이 한 판을 끝까지 (실제 클릭) ───────────────
+  // 🔴 「한 판」은 운에 맡길 수 없다. 정답률 70% 봇은 하트 3개를 4번 만에 잃기도 한다(실측 4회·층 1)
+  //    — 그러면 «측정 무효»로 빨간불이 켜지는데, 코드는 멀쩡하다. 무작위로 빨간불이 켜지는 게이트는
+  //    사람이 게이트를 안 믿게 만든다. 그래서 클릭 수가 찰 때까지 판을 «다시 시작»한다.
+  //    덤으로 재시작 경로(GameObject 전수 리셋)를 매번 밟게 된다.
+  const NEED_CLICKS = 12;
   await startRun(0);
   let clicks = 0;
+  let runs = 1;
   let guard = 0;
-  while (guard++ < 400) {
+  while (guard++ < 900) {
     const s = await state();
-    if (s.phase === 'over') break;
+    if (s.phase === 'over') {
+      if (clicks >= NEED_CLICKS || runs >= 5) break;
+      runs += 1;
+      await page.click('#btn-again');
+      await page.waitForFunction(() => {
+        const c = window.__SMOKE__.app.core;
+        return c && c.phase === 'question';
+      }, null, { timeout: 8000 });
+      continue;
+    }
     if (s.phase !== 'question' || s.answered) { await page.waitForTimeout(60); continue; }
     // 정답률 70% 봇 — 틀리기도 해야 오답 경로(하이라이트·오답노트)가 실행된다
     const pick = Math.random() < 0.7 ? s.ans : Math.floor(Math.random() * s.k);
@@ -257,8 +277,8 @@ async function main() {
     floor: document.querySelector('#result-floor').textContent,
     qa: window.__SMOKE__.qa(),
   }));
-  NOTE(`봇 플레이테스트 클릭 ${clicks}회 · 결과화면 ${final.onResult} · 층 ${final.floor}`);
-  if (clicks < 5) FAIL(`봇이 ${clicks}회만 눌렀다 — 한 판을 두지 못했다(측정 무효)`);
+  NOTE(`봇 플레이테스트 클릭 ${clicks}회 · 판 ${runs}회 · 결과화면 ${final.onResult} · 층 ${final.floor}`);
+  if (clicks < NEED_CLICKS) FAIL(`봇이 판 ${runs}회 동안 ${clicks}회만 눌렀다 — 입력이 먹지 않는다(측정 무효)`);
   if (!final.onResult) FAIL('봇이 하트를 다 잃었는데 결과 화면이 뜨지 않았다');
   if (final.qa.zombieTweens > 0) FAIL(`파괴된 대상을 도는 트윈 ${final.qa.zombieTweens}개 — 생명주기 누수`);
   if (final.qa.loadErrors.length) FAIL(`에셋 로드 실패 ${final.qa.loadErrors.length}건: ${final.qa.loadErrors.join(', ')}`);
@@ -323,8 +343,14 @@ async function main() {
   for (const p of posts) {
     let body = null;
     try { body = JSON.parse(p.body); } catch { FAIL('등수 제출 본문이 JSON 이 아니다'); continue; }
+    // 🔴 기기 밖으로 나가는 필드는 «늘어날 때마다» 여기서 명시적으로 승인돼야 한다.
+    //    m(모드) 은 2026-09-05 에 추가했다 — 세 값 중 하나인 열거형이라 자유 입력이 아니다.
+    //    이 목록을 「대충 통과」시키면 D29 는 그날로 죽는다.
     const keys = Object.keys(body).sort().join(',');
-    if (keys !== 'n,s,sub') FAIL(`등수 제출에 예상 밖 필드: ${keys} (n,s,sub 만 보내야 한다)`);
+    if (keys !== 'm,n,s,sub') FAIL(`등수 제출에 예상 밖 필드: ${keys} (m,n,s,sub 만 보내야 한다)`);
+    if (!['classic', 'thrill', 'sprint'].includes(body.m)) {
+      FAIL(`모드 필드가 «${body.m}» — 정해진 세 값이 아니면 자유 입력이 새는 통로가 된다`);
+    }
     if (typeof body.n !== 'string' || !body.n.includes('*')) {
       FAIL(`제출된 이름 "${body.n}" 에 별표가 없다 — 직접 지은 이름은 가려서 보내야 한다`);
     }

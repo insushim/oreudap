@@ -1,6 +1,6 @@
 // 일일 등수 — 서버가 «받아도 되는 것»만 받는지. 판정은 전부 rank-core 에 있다.
 import { describe, it, expect } from 'vitest';
-import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP } from '../worker/src/rank-core.js';
+import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub } from '../worker/src/rank-core.js';
 import { isGeneratedNick, makeNick, maskNick, isUsableNick } from '../src/core/nickname.js';
 
 const G = isGeneratedNick;
@@ -45,7 +45,8 @@ describe('판 정리 [D29]', () => {
   it('층 상한을 넘거나 0 이하인 기록은 버린다', () => {
     expect(clean({ n: '김*수', s: MAX_FLOOR + 1, sub: 'gugudan' }, G)).toBeNull();
     expect(clean({ n: '김*수', s: 0, sub: 'gugudan' }, G)).toBeNull();
-    expect(clean({ n: '김*수', s: 12, sub: 'gugudan' }, G)).toEqual({ n: '김*수', s: 12, sub: 'gugudan' });
+    // 🔴 모드 없는 옛 형식은 «클래식»으로 읽힌다 — 표는 «과목:모드» 단위다(같은 규칙끼리 줄 세운다).
+    expect(clean({ n: '김*수', s: 12, sub: 'gugudan' }, G)).toEqual({ n: '김*수', s: 12, sub: 'gugudan:classic' });
   });
 
   it('같은 이름은 최고 기록 한 줄만 남는다 — 한 아이가 판을 도배하지 못한다', () => {
@@ -84,5 +85,30 @@ describe('판 정리 [D29]', () => {
     expect(rankOf(rows, 20)).toBe(2);   // 공동 2위
     expect(rankOf(rows, 5)).toBe(5);
     expect(rankOf(rows, 0)).toBeNull();
+  });
+});
+
+describe('모드별 표 분리', () => {
+  const G = isGeneratedNick;
+  it('같은 이름이라도 모드가 다르면 다른 줄이다 — 규칙이 다른 기록은 섞이지 않는다', () => {
+    const day = '2026-09-05';
+    let b = rollover(null, day);
+    b = merge(b, { n: '김*수', s: 40, sub: 'gugudan', m: 'classic' }, day, G);
+    b = merge(b, { n: '김*수', s: 12, sub: 'gugudan', m: 'sprint' }, day, G);
+    expect(b.rows.length).toBe(2);
+    expect(new Set(b.rows.map((r) => r.sub))).toEqual(new Set(['gugudan:classic', 'gugudan:sprint']));
+  });
+  it('낯선 모드는 클래식으로 떨어진다(서버도 신뢰 경계 밖이다)', () => {
+    expect(normSub('gugudan', '해킹')).toBe('gugudan:classic');
+    expect(normSub(null)).toBe('gugudan:classic');
+  });
+  it('과목과 모드를 따로 받는다 — 합쳐 보내면 배포 순서에 물린다', () => {
+    // 🔴 옛 워커가 도는 동안 클라이언트가 'words56:sprint' 를 보내면 화이트리스트에 없어
+    //    첫 과목(구구단)으로 떨어진다 = 영단어 기록이 구구단 표에 실린다. 나눠 받으면 안 물린다.
+    expect(normSub('words56', 'sprint')).toBe('words56:sprint');
+    expect(normSub('words56')).toBe('words56:classic');          // 모드 모르는 옛 클라이언트
+    expect(normSub('words56:thrill')).toBe('words56:thrill');    // 합쳐 온 값도 읽는다
+    expect(clean({ n: '김*수', s: 9, sub: 'words56', m: 'thrill' }, G))
+      .toEqual({ n: '김*수', s: 9, sub: 'words56:thrill' });
   });
 });

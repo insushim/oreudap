@@ -2,7 +2,7 @@
 // 🔴 개인정보는 저장하지 않는다. 저장하는 것: 코인·해금·최고기록·오답노트 박스·미션 진행뿐.
 // localStorage 접근은 전부 try/catch — 사생활 보호 모드·차단 설정에서 접근 자체가 throw 한다.
 
-import { SAVE, SHOP, SRS } from './balance.js';
+import { SAVE, SHOP, SRS, MODES, DEFAULT_MODE } from './balance.js';
 
 const SRS_MAX_BOX = SRS.MAX_BOX;
 
@@ -18,6 +18,7 @@ export function emptySave() {
     missions: { day: '', maxDay: '', progress: {}, claimed: [] },
     totals: { runs: 0, correct: 0, asked: 0 },
     settings: { sound: true, reducedMotion: false, colorSafe: false },
+    mode: DEFAULT_MODE,   // 마지막으로 고른 모드
   };
 }
 
@@ -30,6 +31,16 @@ const MIGRATIONS = {
     ownedThemes: data.ownedThemes || ['dawn'],
     settings: { sound: true, reducedMotion: false, colorSafe: false, ...(data.settings || {}) },
   }),
+  /** v2 → v3: 최고 기록을 «과목:모드» 로 나눈다.
+   *  🔴 모드마다 층수의 뜻이 다르다(클래식 78층 · 60초 질주 55층). 한 칸에 섞으면 기록이
+   *     아니라 잡음이 된다. 기존 값은 전부 클래식에서 세운 것이므로 그리로 옮긴다. */
+  2: (data) => {
+    const d = { ...emptySave(), ...(data && typeof data === 'object' ? data : {}) };
+    const old = d.best && typeof d.best === 'object' ? d.best : {};
+    const best = {};
+    for (const [k, v] of Object.entries(old)) best[k.includes(':') ? k : `${k}:classic`] = v;
+    return { ...d, best, mode: MODES[d.mode] ? d.mode : DEFAULT_MODE };
+  },
 };
 
 export function migrate(version, data) {
@@ -82,6 +93,10 @@ export function sanitize(data) {
   out.ownedThemes = asIdList(out.ownedThemes, themeIds, 'dawn');
   if (!out.ownedSkins.includes(out.skin)) out.skin = 'fox';
   if (!out.ownedThemes.includes(out.theme)) out.theme = 'dawn';
+
+  // 🔴 모드는 화이트리스트로만 통과시킨다 — localStorage 는 신뢰 경계 밖이라
+  //    낯선 값이 들어오면 MODES[mode] 가 undefined 가 되어 rules 참조에서 그 자리에 죽는다.
+  if (!MODES[out.mode]) out.mode = DEFAULT_MODE;
 
   const best = plainObject(out.best);
   out.best = {};

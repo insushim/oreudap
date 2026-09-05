@@ -34,6 +34,7 @@ run "학습 데이터 (D23)"               node tools/check-data.mjs
 run "정답 위치 균형 (D8)"             node tools/answer-balance.mjs
 run "밸런스 격자 (D10·D8b)"           node tools/probe-grid.mjs N=300 --gate
 run "다양성 (D30)"                    node tools/probe-variety.mjs --gate
+run "모드 밸런스 (D33)"               node tools/probe-modes.mjs N=300 --gate
 run "결정론 (D19)"                    "$HOME/.claude/skills/game-builder/tools/check-determinism.sh"
 run "GDD 표 동기화"                   node tools/sync-gdd-table.mjs --check
 run "에셋 매니페스트"                  python3 tools/process-assets.py --check
@@ -45,6 +46,7 @@ run "시각 QA (D15·D16)"               node tools/qa-visual.mjs --dir dist
 run "플레이 QA (D13·D14·D21·D22·D29)" node tools/qa-play.mjs --dir dist
 run "BGM 강도 (D31)"                   node tools/qa-bgm.mjs --dir dist
 run "영어 발음 (D32)"                  node tools/qa-voice.mjs --dir dist
+run "모드 화면 (D34)"                  node tools/qa-modes.mjs --dir dist
 run "올라가는 느낌 (D28)"             node tools/qa-climb.mjs --dir dist
 run "성능·번들 (D25)"                 node tools/qa-perf.mjs --dir dist
 

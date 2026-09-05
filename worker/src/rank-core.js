@@ -5,7 +5,28 @@ export const KEEP = 50;              // 오늘 판에 남기는 줄 수
 export const YDAY_KEEP = 3;          // 어제 상위 몇 줄을 기념으로 남길지
 export const MAX_FLOOR = 500;        // 완벽 플레이 중앙값이 200층이다 — 그 배를 상한으로 둔다
 export const NICK_CAP = 12;
-export const SUBJECTS = ['gugudan', 'words34', 'words56'];
+export const SUBJECT_IDS = ['gugudan', 'words34', 'words56'];
+export const MODE_IDS = ['classic', 'thrill', 'sprint'];
+// 🔴 표는 «같은 규칙끼리»만 줄 세워야 뜻이 있다. 60초 질주 55층과 무한 78층을 한 표에 넣으면
+//    등수가 실력이 아니라 모드 선택을 재게 된다. 그래서 과목이 아니라 «과목:모드» 가 표의 단위다.
+//    옛 클라이언트가 보내는 모드 없는 값은 클래식으로 읽는다(호환).
+export const SUBJECTS = SUBJECT_IDS.flatMap((s) => MODE_IDS.map((m) => `${s}:${m}`));
+
+/**
+ * «과목» 과 «모드» 를 표의 키 하나로 합친다.
+ * 🔴 두 필드를 따로 받는 이유는 배포 순서다. 클라이언트가 `sub:'words56:sprint'` 를 보내면
+ *    아직 옛 워커가 돌고 있는 동안 그 값이 화이트리스트에 없어 SUBJECTS[0](구구단)으로 떨어진다 —
+ *    즉 영단어 기록이 구구단 표에 실린다. 필드를 나눠 두면 옛 워커는 mode 를 무시하고
+ *    과목만 제대로 쓰므로, 클라이언트를 먼저 배포해도 아무것도 망가지지 않는다.
+ */
+export function normSub(v, mode) {
+  const raw = typeof v === 'string' ? v : '';
+  const [subject, inlineMode] = raw.split(':');
+  const sub = SUBJECT_IDS.includes(subject) ? subject : SUBJECT_IDS[0];
+  const m = typeof mode === 'string' && MODE_IDS.includes(mode) ? mode
+    : (MODE_IDS.includes(inlineMode) ? inlineMode : 'classic');
+  return `${sub}:${m}`;
+}
 
 /** 한국 날짜(UTC+9). Workers 의 시계는 UTC 라 그냥 자르면 **아침 9시에 날이 바뀐다.** */
 export function kstDay(ms = Date.now()) {
@@ -35,7 +56,7 @@ export function clean(r, isGenerated) {
   const n = acceptName(r && r.n, isGenerated);
   const s = Math.round(Number(r && r.s) || 0);
   if (!n || !(s > 0) || s > MAX_FLOOR) return null;
-  const sub = SUBJECTS.includes(r.sub) ? r.sub : SUBJECTS[0];
+  const sub = normSub(r && r.sub, r && r.m);
   return { n, s, sub };
 }
 

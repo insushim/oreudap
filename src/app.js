@@ -6,7 +6,7 @@ import { PersistentNotes } from './core/srs.js';
 import { SUBJECTS, describeId } from './core/questions.js';
 import { load, save, emptySave } from './core/storage.js';
 import { applyRun, buy, equip, todayMissions } from './core/economy.js';
-import { SHOP, HEART, SRS, TIMING, tierIndexFor, tierStartFor } from './core/balance.js';
+import { SHOP, HEART, SRS, TIMING, MODES, DEFAULT_MODE, STAMINA, TIER_FLOORS, tierIndexFor, tierStartFor } from './core/balance.js';
 import { computeLayout, columns } from './ui/layout.js';
 import { Sound } from './ui/sound.js';
 import { Say } from './ui/say.js';
@@ -30,11 +30,19 @@ const SUBJECT_META = {
   words56: { emoji: '📘', desc: () => `5·6학년 기본 낱말 ${WORDS_G56.length}개` },
 };
 
+/** 등수판 한 줄의 «과목:모드» 를 사람 말로 — 옛 형식(모드 없음)은 클래식으로 읽는다 */
+function subLabel(sub) {
+  const [subject, mode = 'classic'] = String(sub).split(':');
+  const s = (SUBJECTS[subject] && SUBJECTS[subject].label) || subject;
+  return mode === 'classic' ? s : `${s} · ${(MODES[mode] || {}).label || mode}`;
+}
+
 export class App {
   constructor({ scene, seedFn }) {
     this.scene = scene;
     this.seedFn = seedFn;
     this.data = load();
+    this.mode = MODES[this.data.mode] ? this.data.mode : DEFAULT_MODE;
     this.notes = new PersistentNotes(this.data.notes);
     this.core = null;
     this.subject = 'gugudan';
@@ -127,7 +135,8 @@ export class App {
       box.append(el('span', 'subject-desc', typeof meta.desc === 'function' ? meta.desc() : meta.desc));
       card.append(box);
       const best = el('span', 'subject-best');
-      best.append(el('b', null, String(this.data.best[key] || 0)));
+      // 🔴 모드가 다르면 층수의 뜻이 다르다 — 카드에는 «지금 고른 모드»의 기록을 보여 준다.
+      best.append(el('b', null, String(this.data.best[this.bestKey(key)] || 0)));
       best.append(document.createTextNode('최고 층'));
       card.append(best);
       card.addEventListener('click', () => this.openScope(key));
@@ -184,7 +193,7 @@ export class App {
         if (r.n === mine) li.classList.add('me');
         li.append(el('span', 'rk', String(i + 1)));
         li.append(el('span', 'nm', r.n));
-        li.append(el('span', 'sb', (SUBJECTS[r.sub] && SUBJECTS[r.sub].label) || r.sub));
+        li.append(el('span', 'sb', subLabel(r.sub)));
         li.append(el('span', 'fl', `${r.s}층`));
         list.append(li);
       });
@@ -195,11 +204,37 @@ export class App {
     });
   }
 
+  /** 모드 고르기 — 규칙을 «고르기 전에» 읽을 수 있어야 한다(모드 이름만으로는 아무도 모른다) */
+  renderModePicker() {
+    const box = $('#mode-picker');
+    box.textContent = '';
+    for (const [key, m] of Object.entries(MODES)) {
+      const b = el('button', 'mode-opt');
+      b.type = 'button';
+      b.dataset.mode = key;
+      b.setAttribute('aria-pressed', String(key === this.mode));
+      const txt = el('div', 'mo-txt');
+      txt.append(el('span', 'mo-name', m.label));
+      txt.append(el('span', 'mo-hint', m.hint));
+      b.append(el('span', 'mo-icon', key === 'thrill' ? '🔥' : key === 'sprint' ? '⏱️' : '♾️'));
+      b.append(txt);
+      b.addEventListener('click', () => {
+        this.mode = key;
+        this.data.mode = key;      // 다음 판에도 고른 모드를 기억한다
+        save(this.data);
+        for (const o of box.children) o.setAttribute('aria-pressed', String(o.dataset.mode === key));
+        this.sound.play('button');
+      });
+      box.append(b);
+    }
+  }
+
   // ── 범위 ────────────────────────────────────────────────
   openScope(subject) {
     this.subject = subject;
     this.scope = null;
     $('#scope-title').textContent = `${SUBJECTS[subject].label} — 범위 고르기`;
+    this.renderModePicker();
     const body = $('#scope-body');
     body.textContent = '';
     if (subject === 'gugudan') {
@@ -246,7 +281,7 @@ export class App {
     this.smokeMode = false;
     this.smokeRun = 0;
     this.settled = false;
-    this.core = new GameCore({ seed, subject: this.subject, scope: this.scope, notes: this.notes });
+    this.core = new GameCore({ seed, subject: this.subject, scope: this.scope, mode: this.mode, notes: this.notes });
     this.runStartCoins = this.data.coins;
     this.paused = false;
     $('#overlay-pause').hidden = true;
@@ -258,6 +293,7 @@ export class App {
       this.scene.setTheme(this.data.theme);
     }
     this.sound.unlock();
+    this.sound.setBoundaries(TIER_FLOORS);
     this.sound.resetIntensity();
     this.sound.startBgm();
     this.core.start();
@@ -272,6 +308,7 @@ export class App {
     }
     this.sound.stopBgm();
     this.voice.stop();
+    this.updateDanger(false);
     if (!silent && this.core) this.showResult();
     this.clearChoices();
   }
@@ -317,6 +354,7 @@ export class App {
     this.paused = true;
     this.sound.stopBgm();
     this.voice.stop();
+    this.updateDanger(false);
     $('#overlay-pause').hidden = false;
   }
 
@@ -476,30 +514,103 @@ export class App {
     if (!c) return;
     $('#hud-floor').textContent = c.floor;
     const hearts = $('#hud-hearts');
-    if (hearts.childElementCount !== HEART.MAX) {
-      hearts.textContent = '';
-      for (let i = 0; i < HEART.MAX; i++) hearts.append(el('span', 'heart', '♥'));
+    const useHearts = c.rules.hearts > 0;
+    hearts.hidden = !useHearts;
+    if (useHearts) {
+      const n = c.rules.hearts;
+      if (hearts.childElementCount !== n) {
+        hearts.textContent = '';
+        for (let i = 0; i < n; i++) hearts.append(el('span', 'heart', '♥'));
+      }
+      [...hearts.children].forEach((h, i) => h.classList.toggle('lost', i >= c.hearts));
     }
-    [...hearts.children].forEach((h, i) => h.classList.toggle('lost', i >= c.hearts));
+
+    // 기력 게이지 — 채워진 양과 «찰 수 있는 최대치»를 같이 그린다.
+    const bar = $('#hud-stamina');
+    bar.hidden = c.stamina == null;
+    if (c.stamina != null) {
+      $('#stamina-fill').style.width = `${(c.stamina * 100).toFixed(1)}%`;
+      $('#stamina-cap').style.width = `${(c.staminaCap * 100).toFixed(1)}%`;
+      bar.classList.toggle('is-low', c.lowStamina);
+    }
+
+    // 판 전체 시계(60초 질주)
+    const clock = $('#run-clock');
+    clock.hidden = c.runEndsAt <= 0;
+    if (c.runEndsAt > 0) {
+      const left = c.runLeftMs / 1000;
+      clock.textContent = `${left.toFixed(1)}초`;
+      clock.classList.toggle('is-low', left <= 10);
+    }
+
+    this.updateDanger(c.lowStamina);
   }
 
+  /**
+   * 아슬아슬 연출 — 가장자리가 붉게 맥동하고 심장이 뛴다.
+   * 🔴 상태가 «바뀔 때만» 손댄다. 매 프레임 hidden 을 쓰면 애니메이션이 계속 처음부터 다시 돈다.
+   */
+  updateDanger(on) {
+    if (on === this._danger) return;
+    this._danger = on;
+    $('#danger').hidden = !on;
+    clearInterval(this._beat);
+    this._beat = 0;
+    if (!on) return;
+    // 🔴 한 번만 울리면 «놀람»이고, 계속 울려야 «긴장»이다. 가장자리 맥동(720ms)과 같은 주기로 맞춘다.
+    this.sound.play('heartbeat', 0.55);
+    this._beat = setInterval(() => {
+      if (!this._danger || this.paused) return;
+      this.sound.play('heartbeat', 0.55);
+    }, 720);
+  }
+
+  /**
+   * 매 프레임 도는 HUD. 🔴 기력·판 시계는 «문항 사이에도» 흐르므로 여기 있어야 한다 —
+   *    updateHud(문항 단위)에 두었더니 막대가 1.2초 동안 100%에 멈춰 있었다(D34 가 잡았다).
+   */
   updateTimer() {
     const c = this.core;
     const fill = $('#timer-fill');
-    if (!c || c.phase !== PHASE.QUESTION) { fill.style.transform = 'scaleX(0)'; return; }
+    if (!c) { fill.style.transform = 'scaleX(0)'; return; }
+
+    if (c.stamina != null) {
+      $('#stamina-fill').style.width = `${(c.stamina * 100).toFixed(1)}%`;
+      $('#stamina-cap').style.width = `${(c.staminaCap * 100).toFixed(1)}%`;
+      $('#hud-stamina').classList.toggle('is-low', c.lowStamina);
+      this.updateDanger(c.lowStamina && c.phase !== PHASE.OVER);
+    }
+    if (c.runEndsAt > 0) {
+      const left = c.runLeftMs / 1000;
+      const clock = $('#run-clock');
+      clock.textContent = `${left.toFixed(1)}초`;
+      clock.classList.toggle('is-low', left <= 10);
+    }
+
+    if (c.phase !== PHASE.QUESTION || c.timerMs <= 0) { fill.style.transform = 'scaleX(0)'; return; }
     const r = c.timeRatio;
     fill.style.transform = `scaleX(${r.toFixed(4)})`;
     fill.className = `timer-fill${r < 0.25 ? ' danger' : r < 0.5 ? ' warn' : ''}`;
   }
 
   // ── 결과 ────────────────────────────────────────────────
+  /** 최고 기록 키 — 모드마다 층수의 뜻이 다르므로 «과목:모드» 로 센다 */
+  bestKey(subject = this.subject, mode = this.mode) { return `${subject}:${mode}`; }
+
+  /** 왜 끝났는가 — 「그냥 끝났다」와 「기력이 바닥났다」는 다음 판의 각오가 다르다 */
+  causeText() {
+    if (this.lastCause === 'stamina') return '기력이 바닥났다';
+    if (this.lastCause === 'time') return '1분 종료';
+    return '';
+  }
+
   showResult() {
     const c = this.core;
     if (!c || this.settled) { this.go('result'); return; }   // 정산은 런당 정확히 1회
     this.settled = true;
-    const prevBest = this.data.best[this.subject] || 0;
+    const prevBest = this.data.best[this.bestKey()] || 0;
     const isBest = c.floor > prevBest;
-    this.data.best[this.subject] = Math.max(prevBest, c.floor);
+    this.data.best[this.bestKey()] = Math.max(prevBest, c.floor);
     this.data.coins += c.coins;
     this.data.totals.runs += 1;
     this.data.totals.correct += c.stats.correct;
@@ -513,14 +624,16 @@ export class App {
     $('#result-floor').textContent = c.floor;
     $('#result-acc').textContent = `${Math.round(c.accuracy * 100)}%`;
     $('#result-coin').textContent = c.coins + (missions.gained || 0);
-    $('#result-best').textContent = this.data.best[this.subject];
+    $('#result-best').textContent = this.data.best[this.bestKey()];
     $('#result-gap').textContent = isBest
       ? '최고 기록을 넘었어요!'
       : `최고 기록까지 ${prevBest - c.floor}층 남았어요`;
 
     // 오늘 판에 올린다. 실패해도 게임 흐름은 건드리지 않는다(있으면 좋은 것).
-    submitScore(this.subject, c.floor).then((r) => {
-      if (r && r.ok && r.rank) $("#result-gap").textContent = `오늘 ${r.rank}등! · ${this.data.best[this.subject]}층이 내 최고`;
+    // 🔴 «과목:모드» 로 보낸다 — 규칙이 다른 기록을 한 표에 줄 세우면 등수가 실력이 아니라
+    //    모드 선택을 재게 된다(서버도 같은 키로만 받는다: worker/src/rank-core.js).
+    submitScore(this.subject, c.floor, { mode: this.mode }).then((r) => {
+      if (r && r.ok && r.rank) $("#result-gap").textContent = `오늘 ${r.rank}등! · ${this.data.best[this.bestKey()]}층이 내 최고`;
     }).catch(() => { /* 오프라인 — 조용히 넘어간다 */ });
 
     const miss = $('#result-miss');
@@ -707,7 +820,7 @@ export class App {
         // 스모크는 «연속 시뮬»이다 — 한 판이 끝나면 결정론적으로 다음 판을 잇는다.
         // 그래야 런 재시작 경로(GameObject 전수 리셋)가 반복 검증되고, 숨은 탭 전진도 잴 수 있다.
         if (this.smokeMode) this.smokeRestart();
-        else { this.sound.play('gameover'); this.endRun(false); }
+        else { this.sound.play('gameover'); this.lastCause = ev.cause || 'hearts'; this.endRun(false); }
       }
     }
     this.updateTimer();

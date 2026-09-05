@@ -70,6 +70,14 @@
     "source": "game-builder/tools/gen-sfx.py"
   },
   {
+    "file": "heartbeat.wav",
+    "recipe": "heartbeat(lub-dub)",
+    "seed": 20260905,
+    "sec": 0.72,
+    "license": "self-generated",
+    "source": "oreudap tools/gen-heartbeat.py 오프라인 결정론 렌더(numpy)"
+  },
+  {
     "file": "hit_hard.wav",
     "recipe": "hit_hard",
     "seed": 9153,

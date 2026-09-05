@@ -200,6 +200,11 @@
       "bytes": 8806,
       "m4a": "gameover.m4a"
     },
+    "heartbeat": {
+      "ogg": "heartbeat.ogg",
+      "bytes": 10977,
+      "m4a": "heartbeat.m4a"
+    },
     "streak": {
       "ogg": "streak.ogg",
       "bytes": 11003,
@@ -216,7 +221,7 @@
       "m4a": "wrong.m4a"
     }
   },
-  "audioBytes": 2392369,
-  "eagerAudioBytes": 837261,
+  "audioBytes": 2403346,
+  "eagerAudioBytes": 848238,
   "totalBytes": 497844
 }

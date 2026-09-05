@@ -14,6 +14,10 @@ export const BGM_TIER_KEYS = ['bgm', 'bgm-tense', 'bgm-rush'];
 const RATE_MAX = 1.12;        // 이 위로는 피치 상승이 «빠름»이 아니라 «이상함»이 된다
 const RATE_SPAN = 18;         // 한 단계 안에서 RATE_MAX 에 닿기까지의 층수
 const XFADE_MS = 900;
+// 🔴 경계 몇 층 전부터 다음 트랙을 받는가. 1층부터 다 받으면 «쓸지도 모르는» 400KB 를
+//    셀룰러로 당겨 오고, 판이 일찍 끝나면 그게 전부 낭비다(그리고 받다 만 요청이
+//    페이지 정리와 겹쳐 콘솔 오류로 남기도 한다). 25층 곡은 21층부터면 충분하다.
+const PREFETCH_LEAD = 4;
 
 export class Sound {
   /**
@@ -122,19 +126,27 @@ export class Sound {
    * @param {number} tier  balance.tierIndexFor(floor) — 코어 상수를 UI 가 다시 계산하지 않는다
    * @param {number} tierFrom 이 단계가 시작된 층
    */
+  /** 다음 단계가 시작되는 층(코어가 알려 준다) — 이 값이 있어야 «미리 받기»가 낭비를 피한다 */
+  setBoundaries(floors) { this.boundaries = Array.isArray(floors) ? floors.slice() : []; }
+
   setIntensity(floor, tier, tierFrom) {
     const t = Math.max(0, Math.min(BGM_TIER_KEYS.length - 1, tier | 0));
+    this.nextBoundary = (this.boundaries || [])[t] || 0;
     const into = Math.max(0, floor - (tierFrom || 1));
     this.rate = 1 + (RATE_MAX - 1) * Math.min(1, into / RATE_SPAN);
     if (t !== this.tier) { this.tier = t; this.swapTrack(); }
     else this.applyRate();
-    this.prefetch(t + 1);
+    this.prefetch(t + 1, floor);
     return { tier: this.tier, rate: this.rate, key: this.bgm ? this.bgm.key : null };
   }
 
   /** 다음 단계 트랙을 미리 받는다 — 경계에서 로딩을 기다리면 그 자리에서 음악이 끊긴다 */
-  prefetch(tier) {
+  prefetch(tier, floor = Infinity) {
     if (tier >= BGM_TIER_KEYS.length || !this.scene || !this.manifest) return;
+    // 다음 단계가 시작되는 층은 UI 가 모른다 — 대신 «지금 단계에서 몇 층 올랐는가»로 가늠하지 않고
+    // 호출자가 준 층과 경계 목록을 쓴다. 경계는 setIntensity 가 tier 로 알려 주므로,
+    // 여기서는 «다음 경계까지 LEAD 층 이내인가»만 본다.
+    if (this.nextBoundary && floor < this.nextBoundary - PREFETCH_LEAD) return;
     const key = BGM_TIER_KEYS[tier];
     if (this.loading.has(key) || this.scene.cache.audio.exists(key)) return;
     const meta = (this.manifest.audio || {})[key];

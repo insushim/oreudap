@@ -56,6 +56,8 @@
     <button class="back-btn" data-go="title" type="button" aria-label="뒤로">←</button>
     <h2 id="scope-title">범위 고르기</h2>
     <div id="scope-body"></div>
+    <h3 class="mode-title">모드</h3>
+    <div id="mode-picker" class="mode-picker"></div>
     <button class="primary-btn" id="scope-start" type="button">시작하기</button>
   </section>
 
@@ -63,6 +65,10 @@
   <section id="screen-play" class="screen play">
     <div class="hud">
       <div class="hearts" id="hud-hearts" aria-label="남은 기회"></div>
+      <div class="stamina" id="hud-stamina" hidden aria-label="기력">
+        <div class="stamina-cap" id="stamina-cap"></div>
+        <div class="stamina-fill" id="stamina-fill"></div>
+      </div>
       <div class="floor-box"><span class="floor-n" id="hud-floor">0</span><span class="floor-unit">층</span></div>
       <button class="icon-btn" id="btn-pause" type="button" aria-label="일시정지">॥</button>
     </div>
@@ -74,6 +80,9 @@
     <div id="choices" class="choices"></div>
     <div class="feedback" id="feedback" aria-live="assertive"></div>
     <div class="streak-chip" id="streak-chip" hidden></div>
+    <div class="run-clock" id="run-clock" hidden></div>
+    <!-- 아슬아슬 연출 — 화면 가장자리가 붉게 맥동한다. 포인터를 먹지 않게 pointer-events:none -->
+    <div class="danger-vignette" id="danger" hidden></div>
   </section>
 
   <!-- ── 결과 ─────────────────────────────────────────────── -->
