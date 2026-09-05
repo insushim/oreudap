@@ -121,3 +121,19 @@ export function rankOf(rows, score) {
   const better = rows.filter((r) => r.s > score).length;
   return better + 1;
 }
+
+/**
+ * 🔴 «내 표 안에서» 몇 등이고 몇 명인가. 2026-09-05 교차검증이 잡은 결함 두 개를 한꺼번에 막는다.
+ *
+ * ① 과목을 섞어 세면 안 된다. 표의 단위는 «과목:모드» 인데(위 SUBJECTS 주석) 등수만 판 전체에서
+ *    셌다. 영단어를 처음 하는 아이가 혼자인데도 「2등 · 2명」을 들었다 — 구구단 점수가 등수에
+ *    들어왔기 때문이다. 재현: 구구단 100층 한 명 + 영단어 10층 제출 → rank 2, total 2.
+ * ② 등수는 «내 최고»로 매긴다. 다른 기기에서 낮은 점수를 다시 내면 dedupe 는 최고 기록을 남기는데
+ *    등수는 방금 낸 낮은 점수로 셌다 — 「3등 · 2명」 같은 있을 수 없는 값이 나왔다.
+ *    재현: 졸린오리58 30층·명랑한여우54 25층 상태에서 졸린오리58 이 20층 제출 → rank 3, total 2.
+ */
+export function rankIn(rows, sub, nick, score) {
+  const mine = rows.filter((r) => r.sub === sub);
+  const best = mine.find((r) => r.n === nick);
+  return { rank: rankOf(mine, best ? best.s : score), total: mine.length };
+}

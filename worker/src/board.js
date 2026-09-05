@@ -15,27 +15,40 @@
 //
 // ⚠️ 여전히 정직하게 적어 둘 것: 오르답은 싱글 플레이라 점수를 «클라이언트가» 보낸다.
 //    서버 권위 시뮬레이션이 없으므로 이 판은 «오늘의 기록판»이지 부정을 막는 공식 기록이 아니다.
-import { kstDay, clean, dedupe, rankOf, rowKey, dayPrefix, dayFor, isTestRow, KEEP, YDAY_KEEP } from './rank-core.js';
+import { kstDay, clean, dedupe, rankIn, rowKey, dayPrefix, dayFor, isTestRow, KEEP, YDAY_KEEP } from './rank-core.js';
 import { isGeneratedNick } from '../../src/core/nickname.js';
 
 // 사흘이면 «오늘 + 어제»를 그리고도 남는다. TTL 이 있으니 따로 청소하지 않는다.
 const TTL_S = 3 * 24 * 60 * 60;
 
-/** 하루치 줄을 «목록 조회»로 모은다. KV list 는 1000개까지 주고 cursor 로 이어진다. */
+/**
+ * 하루치 줄을 «목록 조회»로 모은다. KV list 는 1000개까지 주고 cursor 로 이어진다.
+ *
+ * 🔴 상한이 5페이지였는데 그건 위험했다(2026-09-05 교차검증). 키는 «기록 하나»마다 생기지
+ *    «아이 하나»마다 생기지 않는다 — 한 아이가 최고를 갱신할 때마다 한 줄이다. 학년 전체
+ *    300명이 각자 15번 갱신하면 4,500줄로 상한에 닿는다. 넘치는 순간 남는 줄이 조용히
+ *    버려지는데, 키 정렬은 이름순이라 «버려지는 게 하필 1등»일 수 있다.
+ * 🔴 넘쳤다는 사실을 삼키지 않는다 — truncated 를 돌려줘 부르는 쪽이 알 수 있게 한다.
+ *    (등수를 «모르는 채로 맞다고 말하는 것»이 틀린 등수를 말하는 것보다 나쁘다.)
+ */
+const MAX_PAGES = 20;                                // 20,000줄 — 학교 하루치를 넉넉히 덮는다
+
 async function listDay(kv, day) {
   const prefix = dayPrefix(day);
   const rows = [];
   let cursor;
-  for (let page = 0; page < 5; page += 1) {          // 학급 규모에서 5페이지(5000줄)면 충분하다
+  let truncated = true;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
     const res = await kv.list({ prefix, cursor, limit: 1000 });
     for (const k of res.keys) {
       const m = k.metadata;
       // 메타데이터가 없는 줄(옛 형식·잘린 쓰기)은 조용히 버린다 — 목록을 위해 get 을 N번 하지 않는다.
       if (m && typeof m.s === 'number' && m.n && m.sub) rows.push({ n: m.n, s: m.s, sub: m.sub });
     }
-    if (res.list_complete || !res.cursor) break;
+    if (res.list_complete || !res.cursor) { truncated = false; break; }
     cursor = res.cursor;
   }
+  rows.truncated = truncated;
   return rows;
 }
 
@@ -56,7 +69,11 @@ export async function submitScore(kv, row) {
   //    우리는 방금 쓴 줄을 알고 있으므로 목록에 없으면 직접 끼워 넣는다.
   const listed = await listDay(kv, day);
   const rows = dedupe([...listed, add]);
-  return { ok: true, rank: rankOf(rows, add.s), total: rows.length };
+  // 🔴 등수와 인원은 «내 표»(과목:모드) 안에서만 센다 — 판 전체로 세면 영단어 첫 참가자가
+  //    구구단 점수 때문에 2등이 된다(rank-core 의 rankIn 주석에 재현 절차).
+  const out = { ok: true, ...rankIn(rows, add.sub, add.n, add.s) };
+  if (listed.truncated) out.partial = true;      // 등수가 «판 전체»를 못 본 채 계산됐다
+  return out;
 }
 
 export async function topRows(kv, n) {

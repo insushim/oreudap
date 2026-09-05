@@ -1,6 +1,6 @@
 // 일일 등수 — 서버가 «받아도 되는 것»만 받는지. 판정은 전부 rank-core 에 있다.
 import { describe, it, expect } from 'vitest';
-import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub, rowKey, dayFor, isTestRow } from '../worker/src/rank-core.js';
+import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub, rowKey, dayFor, isTestRow, rankIn } from '../worker/src/rank-core.js';
 import { submitScore, topRows } from '../worker/src/board.js';
 import { isGeneratedNick, makeNick, maskNick, isUsableNick } from '../src/core/nickname.js';
 
@@ -259,5 +259,86 @@ describe('게이트 봇의 기록이 아이들 판에 섞이지 않는다', () =
     const kv = kvStub();
     const r = await submitScore(kv, { n: '김철수', s: 30, sub: 'gugudan', m: 'classic', t: 1 });
     expect(r.ok).toBe(false);      // 가리지 않은 실명은 시험 칸에도 안 들어간다
+  });
+});
+
+describe('등수는 «내 표» 안에서 매긴다 [2026-09-05 교차검증 발견]', () => {
+  function kvStub() {
+    const live = new Map(); const meta = new Map();
+    return {
+      async get(k) { const v = live.get(k); return v === undefined ? null : JSON.parse(v); },
+      async put(k, v, o) { live.set(k, v); meta.set(k, (o && o.metadata) || null); },
+      async list({ prefix }) {
+        return { keys: [...live.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name, metadata: meta.get(name) })), list_complete: true };
+      },
+    };
+  }
+
+  it('🔴 영단어를 처음 하는 아이는 구구단 점수 때문에 2등이 되지 않는다', async () => {
+    const kv = kvStub();
+    await submitScore(kv, { n: '졸린오리58', s: 100, sub: 'gugudan', m: 'classic' });
+    const r = await submitScore(kv, { n: '명랑한여우54', s: 10, sub: 'words34', m: 'classic' });
+    expect(r).toMatchObject({ ok: true, rank: 1, total: 1 });
+  });
+
+  it('🔴 등수가 인원보다 클 수 없다 — 낮은 점수를 다시 내도 «내 최고»로 센다', async () => {
+    const kv = kvStub();
+    await submitScore(kv, { n: '졸린오리58', s: 30, sub: 'gugudan', m: 'classic' });
+    await submitScore(kv, { n: '명랑한여우54', s: 25, sub: 'gugudan', m: 'classic' });
+    const r = await submitScore(kv, { n: '졸린오리58', s: 20, sub: 'gugudan', m: 'classic' });
+    expect(r.rank).toBe(1);
+    expect(r.rank).toBeLessThanOrEqual(r.total);
+  });
+
+  it('같은 과목이라도 모드가 다르면 다른 표다', async () => {
+    const kv = kvStub();
+    await submitScore(kv, { n: '졸린오리58', s: 90, sub: 'gugudan', m: 'classic' });
+    const r = await submitScore(kv, { n: '명랑한여우54', s: 12, sub: 'gugudan', m: 'sprint' });
+    expect(r).toMatchObject({ rank: 1, total: 1 });
+  });
+
+  it('rankIn 은 순수 함수로도 같은 판정을 한다', () => {
+    const rows = [
+      { n: '가', s: 100, sub: 'gugudan:classic' },
+      { n: '나', s: 10, sub: 'words34:classic' },
+    ];
+    expect(rankIn(rows, 'words34:classic', '나', 10)).toEqual({ rank: 1, total: 1 });
+    expect(rankIn(rows, 'gugudan:classic', '가', 100)).toEqual({ rank: 1, total: 1 });
+  });
+});
+
+describe('판이 아주 클 때 [2026-09-05 교차검증 발견]', () => {
+  /**
+   * 페이지가 넘치는 KV. 🔴 **1등을 일부러 맨 뒤에 둔다** — 키 정렬은 이름순이라
+   * 상한에 걸려 버려지는 줄이 하필 최고 기록일 수 있다는 게 이 결함의 핵심이다.
+   */
+  function pagedKV(total, topAtEnd = true) {
+    const entries = Array.from({ length: total }, (_, i) => {
+      const last = i === total - 1;
+      const s = last && topAtEnd ? 400 : 10;
+      const n = `빠른여우${String(i).padStart(5, '0')}`;
+      return { name: `r:x:gugudan:classic:${n}:${String(s).padStart(4, '0')}`, metadata: { n, s, sub: 'gugudan:classic' } };
+    });
+    return {
+      async put() {},
+      async list({ cursor, limit }) {
+        const start = Number(cursor || 0);
+        const end = Math.min(start + limit, entries.length);
+        return { keys: entries.slice(start, end), list_complete: end === entries.length, cursor: String(end) };
+      },
+    };
+  }
+
+  it('🔴 5페이지 너머에 있는 1등을 놓치지 않는다 (옛 상한 5,000줄)', async () => {
+    // 8,000줄 중 마지막 줄이 400층. 옛 코드는 5,000줄에서 멈춰 이 줄을 못 봤다.
+    const r = await submitScore(pagedKV(8000), { n: '졸린오리58', s: 30, sub: 'gugudan', m: 'classic' });
+    expect(r.ok).toBe(true);
+    expect(r.partial).toBeUndefined();   // 끝까지 읽었다
+    expect(r.rank).toBe(2);              // 400층 뒤 2등 — 못 봤으면 1등이라고 거짓말했다
+  });
+
+  it('그래도 넘치면 «부분»이라고 정직하게 말한다', async () => {
+    const r = await submitScore(pagedKV(25000), { n: '졸린오리58', s: 30, sub: 'gugudan', m: 'classic' });
+    expect(r.partial).toBe(true);        // 모르는 것을 아는 척하지 않는다
   });
 });
