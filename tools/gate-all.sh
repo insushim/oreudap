@@ -44,6 +44,7 @@ run "2D 스모크 (D17·D18·D19·D22)"     node "$HOME/.claude/skills/game-buil
 run "시각 QA (D15·D16)"               node tools/qa-visual.mjs --dir dist
 run "플레이 QA (D13·D14·D21·D22·D29)" node tools/qa-play.mjs --dir dist
 run "BGM 강도 (D31)"                   node tools/qa-bgm.mjs --dir dist
+run "영어 발음 (D32)"                  node tools/qa-voice.mjs --dir dist
 run "올라가는 느낌 (D28)"             node tools/qa-climb.mjs --dir dist
 run "성능·번들 (D25)"                 node tools/qa-perf.mjs --dir dist
 

@@ -177,6 +177,10 @@ export class QuestionSource {
       choices,
       answerIndex,
       answerText: item.entry[field],
+      // 🔴 UI 가 «영어 낱말»을 프롬프트에서 되짚지 않게 여기서 준다 — 방향이 k2w 면 프롬프트는
+      //    한국어라, 화면 글자로는 무엇을 읽어 줄지 알 수 없다.
+      word: item.entry.w,
+      dir,
     };
   }
 

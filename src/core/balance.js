@@ -131,6 +131,12 @@ export const PERF = {
   P95_DESKTOP_MS: 17.5,
   P95_MOBILE_MS: 34,
   INITIAL_GZIP_BYTES: 3 * 1024 * 1024,
+  // 🔴 «플레이하려고 받는 것»(TOTAL)과 «필요할 때 한 개씩 받는 것»(ONDEMAND)은 다른 예산이다.
+  //    8MB 상한은 번들 이야기다. 낱말 발음 943개는 4KB 짜리를 문제당 하나씩 받는 콘텐츠라
+  //    합쳐서 재면 「받지도 않는 3.8MB」때문에 게이트가 빨간불이 된다 — 틀린 것을 재는 것이다.
+  //    대신 온디맨드에도 상한을 두고, «첫 문제 전에 한 건도 안 받는다»를 게이트가 직접 확인한다.
   TOTAL_BYTES: 8 * 1024 * 1024,
+  ONDEMAND_DIRS: ['assets/say'],
+  ONDEMAND_BYTES: 6 * 1024 * 1024,
   DRAWCALL_WARN: 60,
 };

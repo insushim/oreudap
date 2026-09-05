@@ -106,7 +106,32 @@ async function main() {
     return errs;
   };
 
+  // 🔴 「화면에 소스가 찍혔는가」 — 실제로 났다(2026-09-05: 과목 설명이 함수인데 그대로 append 돼
+  //    타이틀에 «()=>`3·4학년 기본 낱말 ${L.length}개`» 가 보였다). 캡처는 15장 남겼지만
+  //    아무도 «글자 내용»을 읽지 않았으므로 게이트는 전부 초록불이었다.
+  //    문자열화 사고의 지문 — 화면 글자에 이것들이 보이면 코드가 새어 나온 것이다.
+  const CODE_LEAK = [/\$\{/, /=>/, /\[object /, /\bundefined\b/, /\bNaN\b/, /function\s*\(/];
+  const scanText = async (page, name) => {
+    const bad = await page.evaluate(() => {
+      const out = [];
+      const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        const el = n.parentElement;
+        if (!el || el.closest('[hidden]') || !el.offsetParent) continue;
+        const t = n.textContent.trim();
+        if (t) out.push(t);
+      }
+      return out;
+    });
+    for (const t of bad) {
+      for (const re of CODE_LEAK) {
+        if (re.test(t)) { FAIL(`[${name}] 화면에 코드가 찍혔다: «${t.slice(0, 70)}»`); break; }
+      }
+    }
+  };
+
   const snap = async (page, name) => {
+    await scanText(page, name);
     await page.screenshot({ path: path.join(OUT, `${name}.png`) });
     shots.push(name);
   };

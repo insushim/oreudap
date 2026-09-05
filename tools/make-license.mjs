@@ -22,6 +22,14 @@ const SOURCES = {
     license: 'self-generated',
     source: 'ACE-Step 1.5 로컬 생성(gen-bgm.sh) → 이음새 없는 루프로 고정. 외부 서비스·크레딧 사용 0.',
   },
+  // 🔴 이것만 «다른 프로젝트에서 가져온» 자산이다. 다만 남의 것이 아니라 같은 제작자의
+  //    EchoTale(iwenglish)이 OpenAI gpt-4o-mini-tts(voice: nova)로 생성해 둔 것을 재인코딩했다.
+  //    출처를 뭉뚱그리면 나중에 「이건 어디서 왔더라」가 된다 — 경로까지 적어 둔다.
+  say: {
+    license: 'self-generated',
+    source: 'EchoTale(iwenglish) public/seed/_words 의 낱말 발음(OpenAI gpt-4o-mini-tts, voice: nova)을 '
+      + '무음 제거·loudnorm·AAC 32k 모노로 재인코딩(tools/import-word-audio.mjs). 같은 제작자의 자산.',
+  },
 };
 
 const entries = [];
@@ -33,6 +41,14 @@ for (const f of fs.readdirSync(path.join(DEST, 'audio')).sort()) {
   if (!/\.(ogg|m4a)$/.test(f)) continue;
   const kind = f.startsWith('bgm') ? SOURCES.bgm : SOURCES.sfx;
   entries.push({ file: `audio/${f}`, ...kind, date: '2026-09-04' });
+}
+
+// 🔴 낱말 발음은 943개다 — 파일마다 한 줄씩 적으면 원장이 그 하나로 뒤덮여 «읽을 수 없는 원장»이
+//    된다. 출처가 파일마다 다르지 않으므로 코퍼스 한 항목으로 적고 개수를 명시한다.
+const sayFiles = fs.existsSync(path.join(DEST, 'say'))
+  ? fs.readdirSync(path.join(DEST, 'say')).filter((f) => f.endsWith('.m4a')) : [];
+if (sayFiles.length) {
+  entries.push({ file: 'say/*.m4a', count: sayFiles.length, ...SOURCES.say, date: '2026-09-05' });
 }
 
 const ledger = { version: 1, project: 'oreudap', entries };
@@ -47,6 +63,7 @@ const credits = `# 크레딧 — 오르답
 | 캐릭터·발판·배경 이미지 | ${entries.filter((e) => e.file.startsWith('images/')).length} | Meta AI 이미지 생성 후 배경 제거·리사이즈 |
 | 효과음 | ${entries.filter((e) => e.file.startsWith('audio/') && !e.file.includes('bgm')).length} | 오프라인 결정론 렌더(numpy 합성) |
 | 배경 음악 | ${entries.filter((e) => e.file.includes('bgm')).length} | ACE-Step 로컬 생성, 이음새 없는 루프 |
+| 낱말 발음 | ${sayFiles.length} | EchoTale(같은 제작자)이 OpenAI TTS 로 생성한 것을 재인코딩 |
 | 글꼴 | 0 | 기기에 이미 있는 시스템 글꼴만 사용(외부 요청 0) |
 | 아이콘 | 2 | 코드로 그린 도형(PIL·SVG) |
 

@@ -9,6 +9,8 @@ import { applyRun, buy, equip, todayMissions } from './core/economy.js';
 import { SHOP, HEART, SRS, TIMING, tierIndexFor, tierStartFor } from './core/balance.js';
 import { computeLayout, columns } from './ui/layout.js';
 import { Sound } from './ui/sound.js';
+import { Say } from './ui/say.js';
+import { SAY_WORDS } from './data/say-index.js';
 import { makeRng } from './core/rng.js';
 import { WORDS_G34 } from './data/words-g34.js';
 import { WORDS_G56 } from './data/words-g56.js';
@@ -46,6 +48,8 @@ export class App {
     this.smokeRun = 0;
     this.layout = computeLayout(window.innerWidth, window.innerHeight);
     this.sound = new Sound(() => this.data.settings.sound, scene, []);
+    // 영어 낱말은 귀로도 만난다 — 파일 943개, 없는 낱말은 브라우저 음성.
+    this.voice = new Say(() => this.data.settings.sound, SAY_WORDS);
     this.autoBot = null;      // 스모크·플레이테스트 전용
   }
 
@@ -83,8 +87,17 @@ export class App {
     $('#btn-pause').addEventListener('click', () => this.pause());
     $('#btn-resume').addEventListener('click', () => this.resume());
     $('#btn-quit').addEventListener('click', () => { this.quitRun(); });
-    $('#btn-again').addEventListener('click', () => this.startRun());
-    $('#scope-start').addEventListener('click', () => this.startRun());
+    // 🔴 전체화면 요청은 «클릭 핸들러 안»에서만 한다. startRun 에 넣었더니 봇·스모크가 부르는
+    //    경로에서도 요청이 나가 「user gesture 없이 호출」 콘솔 경고가 떴다(D18 이 잡았다).
+    //    제스처가 있는 자리는 여기지 startRun 이 아니다.
+    $('#btn-again').addEventListener('click', () => { this.requestFullscreen(); this.startRun(); });
+    // 🔴 한 번 듣고 놓치는 아이가 반드시 있다 — 문제 카드를 누르면 다시 읽어 준다.
+    //    선택지가 아니라 «문제»를 누르는 것이라 오답 위험이 없다.
+    $('#qcard').addEventListener('click', () => {
+      const q = this.core && this.core.question;
+      if (q && q.word && (q.dir === 'w2k' || this.core.answered)) this.voice.speak(q.word);
+    });
+    $('#scope-start').addEventListener('click', () => { this.requestFullscreen(); this.startRun(); });
   }
 
   applyBodyFlags() {
@@ -110,7 +123,8 @@ export class App {
       card.append(el('span', 'subject-emoji', meta.emoji));
       const box = el('span');
       box.append(el('b', 'subject-name', SUBJECTS[key].label));
-      box.append(el('span', 'subject-desc', meta.desc));
+      // 🔴 desc 는 낱말 수를 세야 해서 함수인 것이 있다 — 그대로 넣으면 화면에 함수 «소스»가 찍힌다.
+      box.append(el('span', 'subject-desc', typeof meta.desc === 'function' ? meta.desc() : meta.desc));
       card.append(box);
       const best = el('span', 'subject-best');
       best.append(el('b', null, String(this.data.best[key] || 0)));
@@ -257,6 +271,7 @@ export class App {
       this.scene.stopAllMotion();
     }
     this.sound.stopBgm();
+    this.voice.stop();
     if (!silent && this.core) this.showResult();
     this.clearChoices();
   }
@@ -270,10 +285,38 @@ export class App {
     this.go('title');
   }
 
+  /**
+   * 전체화면 — 브라우저 주소창·하단바가 화면의 20%를 먹는다. 계단 게임에서 그만큼은 층 수다.
+   * 🔴 «자동»으로는 불가능하다. Fullscreen API 는 사용자 제스처 안에서만 허용되므로
+   *    로드 시점이 아니라 「시작」을 누른 그 호출 스택에서 요청한다.
+   * 🔴 iOS Safari 는 임의 요소의 전체화면을 지원하지 않는다 — 거기서는 조용히 실패하고
+   *    홈 화면에 추가(PWA standalone)가 같은 역할을 한다. 그래서 실패를 «오류로 만들지» 않는다.
+   */
+  requestFullscreen() {
+    const el = document.documentElement;
+    const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!fn || document.fullscreenElement) return false;
+    // 제스처가 «지금» 살아 있는지 브라우저에게 직접 묻는다 — 없으면 요청 자체를 하지 않는다.
+    const ua = navigator.userActivation;
+    if (ua && ua.isActive === false) return false;
+    try {
+      const p = fn.call(el, { navigationUI: 'hide' });
+      if (p && p.catch) p.catch(() => { /* 사용자가 거부했거나 미지원 — 창 모드로 그냥 논다 */ });
+      // 세로 고정은 지원하는 기기에서만. 실패해도 게임은 그대로 된다.
+      const so = screen.orientation;
+      if (so && typeof so.lock === 'function') {
+        const q = so.lock('portrait');
+        if (q && q.catch) q.catch(() => { /* 데스크톱·미지원 */ });
+      }
+      return true;
+    } catch { return false; }
+  }
+
   pause() {
     if (this.screen !== 'play' || !this.core || this.core.phase === PHASE.OVER) return;
     this.paused = true;
     this.sound.stopBgm();
+    this.voice.stop();
     $('#overlay-pause').hidden = false;
   }
 
@@ -328,6 +371,12 @@ export class App {
     $('#qtext').textContent = q.prompt;
     $('#qsub').textContent = q.promptSub || '';
     this.buildChoices(q);
+    // 🔴 영어→뜻 문제는 낱말을 «보여 주면서» 읽어 준다. 뜻→영어 문제에서 미리 읽으면
+    //    정답을 그대로 알려 주는 것이라, 그쪽은 푼 뒤에 읽는다(onResolve).
+    if (q.word) {
+      if (q.dir === 'w2k') this.voice.speak(q.word);
+      else this.voice.prefetch(q.word);   // 답을 낼 때 끊기지 않게 미리 받아만 둔다
+    }
     if (this.scene) this.scene.showRow(q.choices.length);
     this.updateHud();
   }
@@ -337,6 +386,7 @@ export class App {
     const fb = $('#feedback');
     if (res.type === 'correct') {
       this.sound.play('correct');
+      if (q.word && q.dir === 'k2w') this.voice.speak(q.word);
       // 계단이 오를수록 음악이 조여든다 — 층 경계는 코어(balance)가 정하고 UI 는 받아 쓴다.
       this.sound.setIntensity(res.floor, tierIndexFor(res.floor), tierStartFor(res.floor));
       if (this.scene) this.scene.jumpTo(q.answerIndex, res.floor);
@@ -358,6 +408,7 @@ export class App {
       if (res.chose != null) this.markChoice(res.chose, 'is-wrong');
       this.markChoice(q.answerIndex, 'is-correct');
       this.say(fb, res.type === 'timeout' ? `시간 초과! 정답은 ${res.answerText}` : `정답은 ${res.answerText}`, 'bad');
+      if (q.word && q.dir === 'k2w') this.voice.speak(q.word);
     }
     this.updateHud();
   }

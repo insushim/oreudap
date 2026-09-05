@@ -54,9 +54,15 @@ const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) =
 async function main() {
   // ── ① 번들 크기 ────────────────────────────────────────
   const files = walk(DIR);
-  const total = files.reduce((a, f) => a + fs.statSync(f).size, 0);
-  NOTE(`dist 전체 ${(total / 1024 / 1024).toFixed(2)}MB · 파일 ${files.length}개`);
-  if (total > PERF.TOTAL_BYTES) FAIL(`dist 전체 ${(total / 1024 / 1024).toFixed(2)}MB > ${(PERF.TOTAL_BYTES / 1024 / 1024).toFixed(0)}MB`);
+  const isOndemand = (f) => PERF.ONDEMAND_DIRS.some((d) => path.relative(DIR, f).startsWith(d));
+  const sum = (fs_) => fs_.reduce((a, f) => a + fs.statSync(f).size, 0);
+  const bundle = sum(files.filter((f) => !isOndemand(f)));
+  const ondemand = sum(files.filter(isOndemand));
+  const MB = (n) => (n / 1024 / 1024).toFixed(2);
+  NOTE(`번들 ${MB(bundle)}MB · 파일 ${files.length - files.filter(isOndemand).length}개`);
+  NOTE(`온디맨드(${PERF.ONDEMAND_DIRS.join(', ')}) ${MB(ondemand)}MB · 파일 ${files.filter(isOndemand).length}개`);
+  if (bundle > PERF.TOTAL_BYTES) FAIL(`번들 ${MB(bundle)}MB > ${(PERF.TOTAL_BYTES / 1024 / 1024).toFixed(0)}MB`);
+  if (ondemand > PERF.ONDEMAND_BYTES) FAIL(`온디맨드 ${MB(ondemand)}MB > ${(PERF.ONDEMAND_BYTES / 1024 / 1024).toFixed(0)}MB`);
 
   const srv = await serve();
   const url = `http://127.0.0.1:${PORT}/index.html`;
@@ -89,6 +95,11 @@ async function main() {
   await page.waitForTimeout(600);
 
   NOTE(`첫 문제까지 전송량(gzip) ${(transferred / 1024).toFixed(0)}KB`);
+  // 🔴 온디맨드가 «온디맨드로 남아 있는가»를 직접 잰다 — 어딘가에서 preload 로 새면
+  //    분리 예산은 그 순간 거짓말이 된다.
+  const leaked = [...seen].filter((u) => PERF.ONDEMAND_DIRS.some((d) => u.includes(`/${d}/`)));
+  if (leaked.length) FAIL(`첫 문제 전에 온디맨드 파일을 ${leaked.length}건 받았다 — preload 로 새고 있다: ${leaked[0]}`);
+  else NOTE(`온디맨드 파일은 첫 문제 전에 0건 — 필요할 때만 받는다`);
   if (transferred > PERF.INITIAL_GZIP_BYTES) {
     FAIL(`초기 전송량 ${(transferred / 1024 / 1024).toFixed(2)}MB > ${(PERF.INITIAL_GZIP_BYTES / 1024 / 1024).toFixed(0)}MB`);
   }
