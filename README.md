@@ -70,3 +70,7 @@ npm run docs:sync  # GDD 수치표를 게임 코드에서 재생성
 - API: `worker/` (Cloudflare Worker + KV) — `cd worker && npx wrangler deploy`
 - 저장되는 것: 오늘 날짜 · 가려진 이름 · 층수 · 과목, 넷뿐이다. 계정·쿠키·기기 식별자 없음.
 - 규칙과 한계 전문 = `docs/PRIVACY.md` (조작 가능성·KV 일관성까지 적어 두었다)
+- 🔴 **게이트 봇의 기록은 판에 안 뜬다** — 자동화 브라우저에서 나간 제출은 `t:1` 이 붙어 서버의
+  «시험 칸»으로 간다(D36). 게이트를 돌릴 때마다 아이들 판에 가짜 기록이 쌓이던 것을 2026-09-05 에 고쳤다.
+- ⚠️ 워커를 고쳤으면 **배포해야 반영된다**(`cd worker && npx wrangler deploy`).
+  Cloudflare 계정이 둘이라 **반드시 gmail 계정**이어야 한다 — 편의 스크립트 = `tools/finish-rank-ops.sh`

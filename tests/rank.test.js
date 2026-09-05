@@ -1,6 +1,6 @@
 // 일일 등수 — 서버가 «받아도 되는 것»만 받는지. 판정은 전부 rank-core 에 있다.
 import { describe, it, expect } from 'vitest';
-import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub, rowKey } from '../worker/src/rank-core.js';
+import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub, rowKey, dayFor, isTestRow } from '../worker/src/rank-core.js';
 import { submitScore, topRows } from '../worker/src/board.js';
 import { isGeneratedNick, makeNick, maskNick, isUsableNick } from '../src/core/nickname.js';
 
@@ -206,5 +206,58 @@ describe('동시 제출', () => {
     await submitScore(kv, { n: '김*수', s: 20, sub: 'gugudan', m: 'classic' });
     const b = await topRows(kv, 50);
     expect(b.rows[0].s).toBe(30);
+  });
+});
+
+describe('게이트 봇의 기록이 아이들 판에 섞이지 않는다', () => {
+  /** 위 staleKV 와 같은 흉내. 이 describe 안에서만 쓴다. */
+  function kvStub() {
+    const live = new Map(); const meta = new Map();
+    return {
+      async get(k) { const v = live.get(k); return v === undefined ? null : JSON.parse(v); },
+      async put(k, v, o) { live.set(k, v); meta.set(k, (o && o.metadata) || null); },
+      async list({ prefix }) {
+        return { keys: [...live.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name, metadata: meta.get(name) })), list_complete: true };
+      },
+    };
+  }
+
+  it('t 표시를 읽는다', () => {
+    expect(isTestRow({ t: 1 })).toBe(true);
+    expect(isTestRow({ t: true })).toBe(true);
+    expect(isTestRow({ s: 10 })).toBe(false);
+    expect(isTestRow(null)).toBe(false);
+  });
+
+  it('시험 칸은 진짜 날짜와 «다른» 칸이다', () => {
+    expect(dayFor('2026-09-05', false)).toBe('2026-09-05');
+    expect(dayFor('2026-09-05', true)).not.toBe('2026-09-05');
+  });
+
+  it('🔴 봇이 아무리 높은 층을 올려도 오늘 판에는 한 줄도 안 뜬다', async () => {
+    const kv = kvStub();
+    // 봇 다섯이 사람보다 훨씬 높은 기록을 낸다 — 표시가 없으면 판을 통째로 차지할 점수다
+    for (let i = 0; i < 5; i += 1) {
+      await submitScore(kv, { n: `빠른여우${String(i).padStart(2, '0')}`, s: 400 + i, sub: 'gugudan', m: 'classic', t: 1 });
+    }
+    await submitScore(kv, { n: '김*수', s: 7, sub: 'gugudan', m: 'classic' });
+
+    const board = await topRows(kv, 50);
+    expect(board.total).toBe(1);
+    expect(board.rows.map((r) => r.n)).toEqual(['김*수']);
+  });
+
+  it('그래도 봇의 제출은 «성공»으로 돌아온다 — 게이트가 재는 경로가 줄면 안 된다', async () => {
+    const kv = kvStub();
+    const r = await submitScore(kv, { n: '빠른여우07', s: 30, sub: 'gugudan', m: 'classic', t: 1 });
+    expect(r.ok).toBe(true);
+    expect(r.rank).toBe(1);        // 등수 계산까지 돌았다
+    expect(r.total).toBe(1);
+  });
+
+  it('봇 줄은 이름 규칙 검사를 그대로 통과해야 한다 — 시험 칸이 뒷문이 되면 안 된다', async () => {
+    const kv = kvStub();
+    const r = await submitScore(kv, { n: '김철수', s: 30, sub: 'gugudan', m: 'classic', t: 1 });
+    expect(r.ok).toBe(false);      // 가리지 않은 실명은 시험 칸에도 안 들어간다
   });
 });

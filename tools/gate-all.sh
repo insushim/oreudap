@@ -43,7 +43,7 @@ run "라이선스 게이트 (D20)"           "$HOME/.claude/bin/free-assets.sh" 
 run "빌드"                            npx vite build
 run "2D 스모크 (D17·D18·D19·D22)"     node "$HOME/.claude/skills/game-builder/tools/phaser-smoke.mjs" --dir dist --page index.html --port 8181 --steps 600 --scene-cycles 5
 run "시각 QA (D15·D16)"               node tools/qa-visual.mjs --dir dist
-run "플레이 QA (D13·D14·D21·D22·D29)" node tools/qa-play.mjs --dir dist
+run "플레이 QA (D13·D14·D21·D22·D29·D36)" node tools/qa-play.mjs --dir dist
 run "BGM 강도 (D31)"                   node tools/qa-bgm.mjs --dir dist
 run "영어 발음 (D32)"                  node tools/qa-voice.mjs --dir dist
 run "모드 화면 (D34)"                  node tools/qa-modes.mjs --dir dist

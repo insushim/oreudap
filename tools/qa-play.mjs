@@ -350,7 +350,12 @@ async function main() {
     //    m(모드) 은 2026-09-05 에 추가했다 — 세 값 중 하나인 열거형이라 자유 입력이 아니다.
     //    이 목록을 「대충 통과」시키면 D29 는 그날로 죽는다.
     const keys = Object.keys(body).sort().join(',');
-    if (keys !== 'm,n,s,sub') FAIL(`등수 제출에 예상 밖 필드: ${keys} (m,n,s,sub 만 보내야 한다)`);
+    // t(봇 표시)는 2026-09-05 에 추가했다. 이 게이트는 자동화 브라우저에서 도므로 «반드시» 붙어 있어야 한다.
+    if (keys !== 'm,n,s,sub,t') FAIL(`등수 제출에 예상 밖 필드: ${keys} (m,n,s,sub,t 만 보내야 한다)`);
+    // 🔴 봇 표시가 빠지면 게이트가 매일 아이들 등수판에 가짜 기록을 쌓는다(2026-09-05 에 실제로 6줄 쌓였다).
+    //    표시는 클라이언트가 navigator.webdriver 로 스스로 판단한다 — 게이트마다 플래그를 심지 않으므로
+    //    앞으로 게이트가 몇 개 늘어도 자동으로 걸린다. 그 배선이 살아 있는지를 여기서 잰다.
+    if (body.t !== 1) FAIL('봇 표시(t)가 제출 본문에 없다 — 게이트 기록이 아이들 판에 올라간다');
     if (!['classic', 'thrill', 'sprint'].includes(body.m)) {
       FAIL(`모드 필드가 «${body.m}» — 정해진 세 값이 아니면 자유 입력이 새는 통로가 된다`);
     }
@@ -405,7 +410,7 @@ async function main() {
     for (const f of fails) console.log('  ✖ ' + f);
     process.exit(1);
   }
-  console.log('\n✅ 플레이 QA PASS (D13 · D14 · D21 · D22 · D29)');
+  console.log('\n✅ 플레이 QA PASS (D13 · D14 · D21 · D22 · D29 · D36)');
 }
 
 main().catch((e) => {

@@ -47,6 +47,18 @@ export function suggestNick() { return makeNick(); }
 /** 화면과 서버에 나갈 «가려진» 이름 */
 export function displayNick(n) { return maskNick(n || getNick()); }
 
+/**
+ * 이 판이 «봇이 도는 판»인가.
+ * 🔴 게이트마다 플래그를 심는 방식은 쓰지 않는다 — 규칙이 7군데로 흩어지면 반드시 절반만 고쳐진다
+ *    (2026-09-05 에 qa-live 하나를 빠뜨려 배포 후 터졌다). 자동화 브라우저는 스스로 신분을 밝히므로
+ *    그 한 줄을 읽으면 게이트가 몇 개든, 앞으로 몇 개가 생기든 자동으로 걸린다.
+ * 🔴 왜 «안 보내기»가 아니라 «표시해 보내기»인가: D29(실명 마스킹)는 서버까지 실제로 나간 바이트를
+ *    검사해야 뜻이 있다. 보내지 않으면 그 게이트가 아무것도 재지 않게 된다.
+ */
+function isBot() {
+  try { return typeof navigator !== 'undefined' && navigator.webdriver === true; } catch { return false; }
+}
+
 function sentBest(now) {
   const s = ls();
   try {
@@ -85,6 +97,8 @@ export async function submitScore(subject, floor, opts = {}) {
   if ((best[key] || 0) >= floor) return { skipped: 'notbest' };
 
   const body = { n: displayNick(opts.nick), s: floor, sub: subject, m: mode };
+  // 봇의 기록은 아이들이 보는 오늘 판이 아니라 서버의 «시험 칸»으로 간다.
+  if (opts.bot !== undefined ? opts.bot : isBot()) body.t = 1;
   const r = await fetchFn(RANK_API, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });

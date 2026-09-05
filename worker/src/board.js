@@ -15,7 +15,7 @@
 //
 // ⚠️ 여전히 정직하게 적어 둘 것: 오르답은 싱글 플레이라 점수를 «클라이언트가» 보낸다.
 //    서버 권위 시뮬레이션이 없으므로 이 판은 «오늘의 기록판»이지 부정을 막는 공식 기록이 아니다.
-import { kstDay, clean, dedupe, rankOf, rowKey, dayPrefix, KEEP, YDAY_KEEP } from './rank-core.js';
+import { kstDay, clean, dedupe, rankOf, rowKey, dayPrefix, dayFor, isTestRow, KEEP, YDAY_KEEP } from './rank-core.js';
 import { isGeneratedNick } from '../../src/core/nickname.js';
 
 // 사흘이면 «오늘 + 어제»를 그리고도 남는다. TTL 이 있으니 따로 청소하지 않는다.
@@ -42,7 +42,8 @@ async function listDay(kv, day) {
 export async function submitScore(kv, row) {
   const add = clean(row, isGeneratedNick);
   if (!add) return { ok: false, reason: 'rejected' };
-  const day = kstDay();
+  // 🔴 봇의 줄은 시험 칸으로. 아이들이 보는 판(topRows)은 언제나 진짜 날짜만 읽는다.
+  const day = dayFor(kstDay(), isTestRow(row));
   // 🔴 **쓰기 전에 아무것도 읽지 않는다.** 점수가 키에 들어 있어 기록마다 키가 다르므로
   //    덮어쓸 것이 없다. 읽고-고치고-쓰기가 없으면 늦은 읽기도 해를 못 끼친다.
   //    같은 아이가 여러 번 내면 키가 여러 개 생기지만, 클라이언트가 «오늘 최고보다 나을 때만»

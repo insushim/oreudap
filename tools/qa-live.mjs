@@ -73,7 +73,23 @@ if (final.qa.loadErrors.length) fails.push(`에셋 로드 실패: ${final.qa.loa
 if (external.length) fails.push(`외부 도메인 요청 ${external.length}건: ${external.slice(0, 3).join(' | ')}`);
 if (errors.length) fails.push(`콘솔 오류 ${errors.length}건: ${errors.slice(0, 3).join(' | ')}`);
 
+// ── D36: 이 봇의 기록이 아이들 등수판에 올라가지 않았는가 ────────────────
+// 🔴 게이트가 실서버를 재는 이상 봇의 기록도 실서버로 나간다. 나가는 건 맞다(D29 는 «실제로 나간
+//    바이트»를 검사해야 뜻이 있다) — 다만 아이들이 보는 판에 섞이면 안 된다. 서버가 그 줄을
+//    «시험 칸»으로 보내는지는 여기서만 진짜로 확인된다(로컬 게이트는 흉내 낸 KV 로 잰다).
+const botNick = await page.evaluate(() => { try { return localStorage.getItem('oreudap:nick'); } catch { return null; } }).catch(() => null);
 await browser.close();
+if (botNick) {
+  try {
+    const board = await fetch('https://oreudap-rank.simssijjang-d79.workers.dev/api/rank?n=50').then((r) => r.json());
+    const mine = (board.rows || []).filter((r) => r.n === botNick);
+    if (mine.length) {
+      fails.push(`봇 기록이 오늘 판에 올라갔다: ${botNick} ${mine.map((r) => r.s + '층').join(', ')} — 워커가 아직 옛 버전이다(cd worker && npx wrangler deploy)`);
+    } else {
+      notes.push(`등수판 청결 OK — 봇 이름(${botNick})이 오늘 판 ${board.total || 0}줄에 없다`);
+    }
+  } catch (e) { notes.push(`등수판 확인 실패(측정 안 됨): ${e.message}`); }
+}
 console.log(`\n── 배포 실측 (${TARGET}) ──`);
 for (const n of notes) console.log('  · ' + n);
 if (fails.length) { console.log('\n❌ 배포 실측 FAIL'); for (const f of fails) console.log('  ✖ ' + f); process.exit(1); }
