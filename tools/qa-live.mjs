@@ -77,18 +77,42 @@ if (errors.length) fails.push(`콘솔 오류 ${errors.length}건: ${errors.slice
 // 🔴 게이트가 실서버를 재는 이상 봇의 기록도 실서버로 나간다. 나가는 건 맞다(D29 는 «실제로 나간
 //    바이트»를 검사해야 뜻이 있다) — 다만 아이들이 보는 판에 섞이면 안 된다. 서버가 그 줄을
 //    «시험 칸»으로 보내는지는 여기서만 진짜로 확인된다(로컬 게이트는 흉내 낸 KV 로 잰다).
-const botNick = await page.evaluate(() => { try { return localStorage.getItem('oreudap:nick'); } catch { return null; } }).catch(() => null);
+// 🔴 검사가 뜻을 가지려면 «실제로 제출이 나가야» 한다. 여기까지는 정답만 눌렀을 뿐
+//    정산(showResult)에 닿지 않았으므로 제출이 0건이다 — 그 상태로 판을 보면 언제나 «깨끗»하다.
+//    2026-09-05 에 실제로 그 헛검사가 PASS 를 찍었다. 그래서 판을 끝내고 제출을 만든다.
+const settle = await page.evaluate(async () => {
+  const app = window.__SMOKE__.app;
+  try { localStorage.removeItem('oreudap:sent'); } catch { /* 무시 */ }
+  const nick = (() => { try { return localStorage.getItem('oreudap:nick'); } catch { return null; } })();
+  const floor = app.core ? app.core.floor : 0;
+  app.quitRun();
+  await new Promise((r) => setTimeout(r, 2500));
+  return { nick, floor, settled: app.settled };
+}).catch(() => null);
 await browser.close();
-if (botNick) {
-  try {
-    const board = await fetch('https://oreudap-rank.simssijjang-d79.workers.dev/api/rank?n=50').then((r) => r.json());
-    const mine = (board.rows || []).filter((r) => r.n === botNick);
-    if (mine.length) {
-      fails.push(`봇 기록이 오늘 판에 올라갔다: ${botNick} ${mine.map((r) => r.s + '층').join(', ')} — 워커가 아직 옛 버전이다(cd worker && npx wrangler deploy)`);
-    } else {
-      notes.push(`등수판 청결 OK — 봇 이름(${botNick})이 오늘 판 ${board.total || 0}줄에 없다`);
-    }
-  } catch (e) { notes.push(`등수판 확인 실패(측정 안 됨): ${e.message}`); }
+
+if (!settle || !settle.nick || !settle.settled || !(settle.floor > 0)) {
+  fails.push(`등수 제출이 만들어지지 않았다(측정 무효) — ${JSON.stringify(settle)}`);
+} else {
+  const { nick, floor } = settle;
+  // 🔴 KV 목록 조회는 방금 쓴 줄을 30~60초쯤 뒤에야 보여 준다. 곧바로 «없다»를 결론으로 삼으면
+  //    워커가 옛 버전이어도 통과해 버린다. 보일 때까지 기다렸다가 판정한다.
+  const API = 'https://oreudap-rank.simssijjang-d79.workers.dev/api/rank?n=50';
+  let found = null; let total = 0;
+  for (let i = 0; i < 15; i += 1) {                 // 최대 약 90초
+    try {
+      const board = await fetch(API).then((r) => r.json());
+      total = board.total || 0;
+      const mine = (board.rows || []).filter((r) => r.n === nick);
+      if (mine.length) { found = mine; break; }
+    } catch { /* 다음 회차에 다시 */ }
+    await new Promise((r) => setTimeout(r, 6000));
+  }
+  if (found) {
+    fails.push(`봇 기록이 오늘 판에 올라갔다: ${nick} ${found.map((r) => r.s + '층').join(', ')} — 워커가 아직 옛 버전이다 (bash tools/finish-rank-ops.sh)`);
+  } else {
+    notes.push(`등수판 청결 OK — ${nick} ${floor}층을 제출했는데 90초를 기다려도 오늘 판(${total}줄)에 안 뜬다`);
+  }
 }
 console.log(`\n── 배포 실측 (${TARGET}) ──`);
 for (const n of notes) console.log('  · ' + n);
