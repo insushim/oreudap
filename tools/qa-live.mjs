@@ -31,6 +31,8 @@ await page.evaluate(async () => {
   const t = Date.now();
   while (!window.__SMOKE__ && Date.now() - t < 25000) await new Promise((r) => setTimeout(r, 50));
   await window.__SMOKE__.ready;
+    // 첫 판 안내(D35)는 판을 멈춰 세운다 — 실측 봇은 «이미 놀아 본 아이»다.
+    window.__SMOKE__.app.data.seenHow = true;
 });
 notes.push(`부팅 ${Date.now() - t0}ms`);
 
