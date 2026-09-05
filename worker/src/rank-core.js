@@ -60,6 +60,24 @@ export function clean(r, isGenerated) {
   return { n, s, sub };
 }
 
+/**
+ * 한 줄이 저장되는 키. 🔴 **점수까지 키에 넣는다** — 이 파일에서 가장 중요한 줄이다.
+ *
+ * 「판 전체가 아니라 줄 하나」까지만 갔을 때도 여전히 틀렸다. 같은 아이가 다시 제출할 때
+ * «내 줄을 읽어 더 높으면 쓴다»를 하면, KV 의 늦은 읽기가 옛 점수를 줘서 30층이 20층으로
+ * 내려앉는다(테스트로 재현했다). 점수가 키의 일부면 서로 다른 기록은 서로 다른 키라서
+ * **덮어쓰기 자체가 일어나지 않는다** — 쓰기 전에 읽을 일도 없다. 최고 기록은 dedupe 가 고른다.
+ *
+ * 이름에는 `:` 가 들어올 수 없다(acceptName 이 한글·영숫자·별표만 통과시킨다).
+ * 점수는 0 채움 4자리 — 키 정렬이 곧 점수 정렬이 되어 눈으로 훑기 쉽다.
+ */
+export function rowKey(day, sub, n, s) {
+  return `r:${day}:${sub}:${n}:${String(Math.round(s)).padStart(4, '0')}`;
+}
+
+/** 키에서 날짜를 되꺼낸다(목록 조회용 접두사와 짝) */
+export function dayPrefix(day) { return `r:${day}:`; }
+
 /** 날이 바뀌었으면 오늘 판을 비우고 «어제 상위»만 남긴다. */
 export function rollover(b, day) {
   if (b && b.day === day) return b;

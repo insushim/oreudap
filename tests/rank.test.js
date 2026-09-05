@@ -1,6 +1,7 @@
 // 일일 등수 — 서버가 «받아도 되는 것»만 받는지. 판정은 전부 rank-core 에 있다.
 import { describe, it, expect } from 'vitest';
-import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub } from '../worker/src/rank-core.js';
+import { acceptName, clean, merge, dedupe, rankOf, rollover, MAX_FLOOR, KEEP, normSub, rowKey } from '../worker/src/rank-core.js';
+import { submitScore, topRows } from '../worker/src/board.js';
 import { isGeneratedNick, makeNick, maskNick, isUsableNick } from '../src/core/nickname.js';
 
 const G = isGeneratedNick;
@@ -110,5 +111,100 @@ describe('모드별 표 분리', () => {
     expect(normSub('words56:thrill')).toBe('words56:thrill');    // 합쳐 온 값도 읽는다
     expect(clean({ n: '김*수', s: 9, sub: 'words56', m: 'thrill' }, G))
       .toEqual({ n: '김*수', s: 9, sub: 'words56:thrill' });
+  });
+});
+
+// ── 동시 제출에서 줄이 사라지지 않는다 (2026-09-05 실측 결함의 재발 방지) ──
+describe('동시 제출', () => {
+  /**
+   * KV 를 흉내 내되 «최종적 일관성»까지 흉내 낸다.
+   * 🔴 get 이 항상 최신값을 주면 옛 구조(판 전체를 한 키에)도 통과해 버린다 —
+   *    그러면 이 테스트는 우리가 고친 바로 그 결함을 못 잡는다. 그래서 읽기를 «한 박자 늦춘다».
+   */
+  function staleKV() {
+    const live = new Map();     // 실제 저장
+    const seen = new Map();     // 읽기가 보는 (한 박자 늦은) 값
+    return {
+      live,
+      async get(key) {
+        const v = seen.get(key);
+        seen.set(key, live.get(key));      // 다음 읽기부터 최신이 보인다
+        return v === undefined ? null : JSON.parse(v);
+      },
+      async put(key, value, opts) {
+        live.set(key, value);
+        this.meta.set(key, (opts && opts.metadata) || null);
+      },
+      meta: new Map(),
+      async list({ prefix }) {
+        const keys = [...live.keys()].filter((k) => k.startsWith(prefix))
+          .map((name) => ({ name, metadata: this.meta.get(name) }));
+        return { keys, list_complete: true };
+      },
+    };
+  }
+
+  it('같은 순간에 들어온 서로 다른 제출이 서로를 덮어쓰지 않는다', async () => {
+    const kv = staleKV();
+    const people = Array.from({ length: 25 }, (_, i) => ({
+      n: `빠른여우${String(i).padStart(2, '0')}`, s: i + 1, sub: 'gugudan', m: 'classic',
+    }));
+    // 🔴 «동시»를 흉내 낸다 — 순차로 await 하면 옛 구조도 통과한다.
+    await Promise.all(people.map((p) => submitScore(kv, p)));
+    const board = await topRows(kv, 50);
+    expect(board.total).toBe(25);
+    expect(new Set(board.rows.map((r) => r.n)).size).toBe(25);
+  });
+
+  it('같은 사람이 다시 내면 «더 높은 기록»만 남는다(줄이 늘지 않는다)', async () => {
+    const kv = staleKV();
+    await submitScore(kv, { n: '김*수', s: 10, sub: 'gugudan', m: 'classic' });
+    await submitScore(kv, { n: '김*수', s: 30, sub: 'gugudan', m: 'classic' });
+    await submitScore(kv, { n: '김*수', s: 20, sub: 'gugudan', m: 'classic' });
+    const b = await topRows(kv, 50);
+    expect(b.total).toBe(1);
+    expect(b.rows[0].s).toBe(30);
+  });
+
+  it('모드가 다르면 같은 사람도 다른 줄이다', async () => {
+    const kv = staleKV();
+    await submitScore(kv, { n: '김*수', s: 40, sub: 'words56', m: 'classic' });
+    await submitScore(kv, { n: '김*수', s: 12, sub: 'words56', m: 'sprint' });
+    const b = await topRows(kv, 50);
+    expect(b.total).toBe(2);
+    expect(new Set(b.rows.map((r) => r.sub))).toEqual(new Set(['words56:classic', 'words56:sprint']));
+  });
+
+  it('방금 낸 기록이 목록에 아직 안 보여도 내 등수에는 내가 들어간다', async () => {
+    // 🔴 KV list 는 방금 쓴 키를 30~60초쯤 뒤에야 보여 준다. 그대로 매기면 «내가 빠진 판»에서
+    //    내 등수를 계산해 방금 1등을 했는데도 이상한 숫자가 나온다.
+    const kv = staleKV();
+    kv.list = async () => ({ keys: [], list_complete: true });   // 목록이 아직 텅 빈 상태
+    const r = await submitScore(kv, { n: '김*수', s: 40, sub: 'gugudan', m: 'classic' });
+    expect(r.ok).toBe(true);
+    expect(r.rank).toBe(1);
+    expect(r.total).toBe(1);
+  });
+
+  it('별표 없는 실명은 키를 만들지도 않는다', async () => {
+    const kv = staleKV();
+    const r = await submitScore(kv, { n: '김철수', s: 50, sub: 'gugudan', m: 'classic' });
+    expect(r.ok).toBe(false);
+    expect(kv.live.size).toBe(0);
+  });
+
+  it('줄 키에 날짜·과목·모드·이름·점수가 다 들어간다', () => {
+    // 점수까지 키에 있어야 «다른 기록 = 다른 키» 가 되어 덮어쓰기가 원천적으로 없다.
+    expect(rowKey('2026-09-05', 'words56:sprint', '김*수', 12)).toBe('r:2026-09-05:words56:sprint:김*수:0012');
+  });
+
+  it('늦은 읽기가 있어도 낮은 점수가 높은 기록을 덮지 않는다', async () => {
+    // 🔴 이 테스트가 실제로 결함을 잡았다 — 「내 줄을 읽어 더 높으면 쓴다」 구조에서는
+    //    30층이 20층으로 내려앉았다(KV 읽기가 한 박자 늦기 때문).
+    const kv = staleKV();
+    await submitScore(kv, { n: '김*수', s: 30, sub: 'gugudan', m: 'classic' });
+    await submitScore(kv, { n: '김*수', s: 20, sub: 'gugudan', m: 'classic' });
+    const b = await topRows(kv, 50);
+    expect(b.rows[0].s).toBe(30);
   });
 });
