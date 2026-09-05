@@ -101,6 +101,9 @@ async function main() {
       const t0 = Date.now();
       while (!window.__SMOKE__ && Date.now() - t0 < 20000) await new Promise((r) => setTimeout(r, 50));
       await window.__SMOKE__.ready;
+    // 🔴 이 게이트들은 «이미 놀아 본 아이»를 잰다 — 첫 판 안내(D35)는 판을 멈춰 세우므로
+    //    여기서 켜 두면 봇이 한 층도 못 오른다. 첫 판 경험 자체는 qa-howto.mjs 가 따로 잰다.
+    window.__SMOKE__.app.data.seenHow = true;
     });
     try { await fn(page, vp); } finally { await ctx.close(); }
     return errs;

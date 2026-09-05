@@ -70,6 +70,7 @@
         <div class="stamina-fill" id="stamina-fill"></div>
       </div>
       <div class="floor-box"><span class="floor-n" id="hud-floor">0</span><span class="floor-unit">층</span></div>
+      <button class="icon-btn" id="btn-how" type="button" aria-label="놀이 방법">?</button>
       <button class="icon-btn" id="btn-pause" type="button" aria-label="일시정지">॥</button>
     </div>
     <div class="qcard" id="qcard">
@@ -133,6 +134,20 @@
   </section>
 
   <!-- ── 일시정지 ─────────────────────────────────────────── -->
+  <!-- 처음 들어온 아이는 «어떻게 답하는지» 모른다. 판이 시작되기 전에 한 번 보여 준다. -->
+  <div id="overlay-how" class="overlay" hidden>
+    <div class="overlay-card how-card">
+      <h2>이렇게 놀아요</h2>
+      <ol class="how-steps">
+        <li><b>1</b><span>위에 뜬 문제를 봐요</span></li>
+        <li><b>2</b><span id="how-input">정답이 적힌 발판을 눌러요</span></li>
+        <li><b>3</b><span>맞으면 한 층 올라가요. 틀리면 <em id="how-life">하트가 하나 줄어요</em></span></li>
+      </ol>
+      <p class="how-tip" id="how-tip"></p>
+      <button class="primary-btn" id="btn-how-start" type="button">알겠어요, 시작!</button>
+    </div>
+  </div>
+
   <div id="overlay-pause" class="overlay" hidden>
     <div class="overlay-card">
       <h2>잠깐 멈춤</h2>

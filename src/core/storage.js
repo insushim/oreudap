@@ -19,6 +19,7 @@ export function emptySave() {
     totals: { runs: 0, correct: 0, asked: 0 },
     settings: { sound: true, reducedMotion: false, colorSafe: false },
     mode: DEFAULT_MODE,   // 마지막으로 고른 모드
+    seenHow: false,       // 놀이 방법 안내를 이미 봤는가
   };
 }
 
@@ -97,6 +98,7 @@ export function sanitize(data) {
   // 🔴 모드는 화이트리스트로만 통과시킨다 — localStorage 는 신뢰 경계 밖이라
   //    낯선 값이 들어오면 MODES[mode] 가 undefined 가 되어 rules 참조에서 그 자리에 죽는다.
   if (!MODES[out.mode]) out.mode = DEFAULT_MODE;
+  out.seenHow = out.seenHow === true;
 
   const best = plainObject(out.best);
   out.best = {};

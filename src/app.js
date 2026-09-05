@@ -99,6 +99,13 @@ export class App {
     //    경로에서도 요청이 나가 「user gesture 없이 호출」 콘솔 경고가 떴다(D18 이 잡았다).
     //    제스처가 있는 자리는 여기지 startRun 이 아니다.
     $('#btn-again').addEventListener('click', () => { this.requestFullscreen(); this.startRun(); });
+    $('#btn-how-start').addEventListener('click', () => { this.sound.unlock(); this.hideHow(); });
+    // 🔴 pause() 를 부르면 «잠깐 멈춤» 카드가 안내 위를 덮어 버튼을 못 누른다(D35 가 잡았다).
+    //    시계만 세우고 카드는 띄우지 않는다 — 멈춤 해제는 hideHow 가 한다.
+    $('#btn-how').addEventListener('click', () => {
+      if (this.screen === 'play') { this.paused = true; this.sound.stopBgm(); this.voice.stop(); }
+      this.showHow(true);
+    });
     // 🔴 한 번 듣고 놓치는 아이가 반드시 있다 — 문제 카드를 누르면 다시 읽어 준다.
     //    선택지가 아니라 «문제»를 누르는 것이라 오답 위험이 없다.
     $('#qcard').addEventListener('click', () => {
@@ -292,6 +299,9 @@ export class App {
       this.scene.setSkin(this.data.skin);
       this.scene.setTheme(this.data.theme);
     }
+    // 🔴 처음이면 안내를 먼저 띄우고 «판을 멈춘 채» 기다린다. 안내를 읽는 동안 시간이
+    //    흐르면(특히 아슬아슬 모드는 기력이 줄면) 읽자마자 죽는다.
+    if (this.showHow()) this.paused = true;
     this.sound.unlock();
     this.sound.setBoundaries(TIER_FLOORS);
     this.sound.resetIntensity();
@@ -594,6 +604,43 @@ export class App {
   }
 
   // ── 결과 ────────────────────────────────────────────────
+  /**
+   * 놀이 방법 안내. 🔴 처음 들어온 아이는 «어떻게 답하는지»를 모른다 —
+   *    문제만 뜨고 발판이 보이는데, 그걸 누르라는 말이 어디에도 없었다(사용자 지적 2026-09-05).
+   * 🔴 기기마다 다르게 적는다. 폰에서 「방향키」라고 쓰면 없는 키를 찾게 되고,
+   *    PC 에서 「손가락으로」라고 쓰면 우스워진다. 둘 다 되는 기기는 둘 다 적는다.
+   * 🔴 모드마다 «틀리면 무슨 일이 일어나는지»가 다르다 — 아슬아슬은 하트가 아예 없다.
+   */
+  showHow(force = false) {
+    if (!force && this.data.seenHow) return false;
+    const touch = matchMedia('(any-pointer: coarse)').matches;
+    const keys = matchMedia('(any-hover: hover) and (any-pointer: fine)').matches;
+    $('#how-input').textContent = touch && keys
+      ? '정답이 적힌 발판을 누르거나 ← → 키를 눌러요'
+      : touch ? '정답이 적힌 발판을 손가락으로 눌러요'
+        : '정답이 적힌 발판을 누르거나 ← → 키를 눌러요';
+    const rules = MODES[this.mode];
+    $('#how-life').textContent = rules.stamina ? '기력이 확 줄어요' : `하트가 하나 줄어요 (${rules.hearts}개)`;
+    $('#how-tip').textContent = rules.stamina
+      ? '기력은 가만히 있어도 계속 줄어요. 빨리 맞힐수록 더 채워져요.'
+      : rules.runMs ? '1분 동안 몇 층까지 오르는지 겨뤄요.'
+        : '10층마다 금빛 발판이 남아요. 어디까지 올라갈 수 있을까요?';
+    $('#overlay-how').hidden = false;
+    return true;
+  }
+
+  hideHow() {
+    $('#overlay-how').hidden = true;
+    if (!this.data.seenHow) { this.data.seenHow = true; this.persist(); }
+    // 🔴 안내를 띄우려고 멈춰 놨으므로 닫을 때 반드시 풀어 준다 — 안 풀면 판이 영영 멈춘다.
+    //    (판 중에 «?» 로 열었을 때도 같은 자리로 돌아온다.)
+    if (this.screen === 'play') {
+      this.paused = false;
+      $('#overlay-pause').hidden = true;
+      this.lastFrame = performance.now();
+    }
+  }
+
   /** 최고 기록 키 — 모드마다 층수의 뜻이 다르므로 «과목:모드» 로 센다 */
   bestKey(subject = this.subject, mode = this.mode) { return `${subject}:${mode}`; }
 
