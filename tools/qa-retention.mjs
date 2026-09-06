@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 재방문·재미 게이트 — D37~D40.
+ * 재방문·재미 게이트 — D37~D41.
  *
  * 🔴 이 게이트가 재는 것은 「재미있는가」가 아니다. 그건 기계가 못 잰다.
  *    재는 것은 「재미를 만들려다 아이를 압박하고 있지 않은가」다 —
@@ -173,6 +173,30 @@ async function main() {
   if (seen.length) FAIL(`압박 문구가 화면에 있다: ${seen.join(' · ')}`);
   NOTE(`압박 문구 검사 ${screens.length}화면 · 금지어 ${BANNED.length}개 · 발견 0`);
 
+  // ── D41: 제목이 원작 상표를 비껴간다 ──────────────────────────
+  // 🔴 docs/RESEARCH.md §3-1 이 「제목에 «무한»·«계단» 조합 및 «Infinite Stairs» 회피」를
+  //    적어 뒀는데, 정작 제목이 「정답을 밟고 오르는 무한 계단」이었다(2026-09-06 발견).
+  //    규칙을 문서에만 적어 두면 반드시 어긴다 — 게이트가 없는 항목은 아무도 안 잡는다.
+  // 🔴 «무한»과 «계단»을 각각 금지하는 게 아니다. 둘이 «가까이 붙는 것»이 상표를 닮게 만든다.
+  const brand = await page.evaluate(async () => {
+    const title = document.title || '';
+    const desc = document.querySelector('meta[name="description"]')?.content || '';
+    let mf = '';
+    try {
+      const href = document.querySelector('link[rel="manifest"]')?.href;
+      if (href) mf = JSON.stringify(await fetch(href).then((r) => r.json()));
+    } catch { mf = ''; }
+    return { title, desc, mf };
+  });
+  // 「무한」과 「계단」 사이에 글자가 5자 이내면 «조합»으로 본다(「무한 계단」·「무한의 계단」·「무한 학습 계단」)
+  const COMBO = /무한.{0,5}계단|계단.{0,5}무한/;
+  const EN = /infinite\s*stairs/i;
+  for (const [where, text] of Object.entries({ '제목': brand.title, '설명': brand.desc, 'manifest': brand.mf })) {
+    if (COMBO.test(text)) FAIL(`${where}에 «무한+계단» 조합이 있다 — 원작 상표를 닮는다: "${String(text).slice(0, 80)}"`);
+    if (EN.test(text)) FAIL(`${where}에 «Infinite Stairs» 가 있다: "${String(text).slice(0, 80)}"`);
+  }
+  NOTE(`제목 "${brand.title}" · 상표 회피 OK`);
+
   // ── D40: 종료점이 보인다 ─────────────────────────────────────
   const stop = await page.evaluate(async () => {
     const app = window.__SMOKE__.app;
@@ -214,14 +238,14 @@ async function main() {
   await browser.close();
   srv.close();
 
-  console.log('\n── 재방문·재미 게이트 (D37~D40) ───────────────');
+  console.log('\n── 재방문·재미 게이트 (D37~D41) ───────────────');
   for (const n of notes) console.log('  · ' + n);
   if (fails.length) {
     console.log('\n❌ 재방문 게이트 FAIL');
     for (const f of fails) console.log('  ✖ ' + f);
     process.exit(1);
   }
-  console.log('\n✅ 재방문 게이트 PASS (D37 · D38 · D39 · D40)');
+  console.log('\n✅ 재방문 게이트 PASS (D37 · D38 · D39 · D40 · D41)');
 }
 
 main().catch((e) => {
