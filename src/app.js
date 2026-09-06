@@ -15,6 +15,9 @@ import { makeRng } from './core/rng.js';
 import { WORDS_G34 } from './data/words-g34.js';
 import { WORDS_G56 } from './data/words-g56.js';
 import { getNick, setNick, suggestNick, displayNick, fetchBoard, submitScore, todayKey } from './core/rankClient.js';
+import { journeyOf, currentZone, nextZoneGap } from './core/journey.js';
+import { planForNow, starsFor, recordFlag, todayStars, flagSummary } from './core/daily.js';
+import { applyPerId, masteryList, weakest, stampToday, weekView } from './core/mastery.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -47,6 +50,7 @@ export class App {
     this.core = null;
     this.subject = 'gugudan';
     this.scope = null;
+    this.daily = null;        // 오늘의 계단으로 시작했으면 그 설계도(아니면 null)
     this.screen = 'title';
     this.choiceNodes = [];
     this.lastFrame = 0;
@@ -98,7 +102,12 @@ export class App {
     // 🔴 전체화면 요청은 «클릭 핸들러 안»에서만 한다. startRun 에 넣었더니 봇·스모크가 부르는
     //    경로에서도 요청이 나가 「user gesture 없이 호출」 콘솔 경고가 떴다(D18 이 잡았다).
     //    제스처가 있는 자리는 여기지 startRun 이 아니다.
-    $('#btn-again').addEventListener('click', () => { this.requestFullscreen(); this.startRun(); });
+    // 🔴 오늘의 계단을 하던 중이면 «같은 판»으로 다시 간다. 무작위로 돌려보내면
+    //    아이는 방금 아쉬웠던 그 판을 다시 만날 수 없고, 별을 올릴 길도 사라진다.
+    $('#btn-again').addEventListener('click', () => {
+      this.requestFullscreen();
+      if (this.daily) this.startDaily(this.subject); else this.startRun();
+    });
     $('#btn-how-start').addEventListener('click', () => { this.sound.unlock(); this.hideHow(); });
     // 🔴 pause() 를 부르면 «잠깐 멈춤» 카드가 안내 위를 덮어 버튼을 못 누른다(D35 가 잡았다).
     //    시계만 세우고 카드는 띄우지 않는다 — 멈춤 해제는 hideHow 가 한다.
@@ -113,6 +122,11 @@ export class App {
       if (q && q.word && (q.dir === 'w2k' || this.core.answered)) this.voice.speak(q.word);
     });
     $('#scope-start').addEventListener('click', () => { this.requestFullscreen(); this.startRun(); });
+    // 오늘의 계단 — 범위 선택을 건너뛴다(오늘의 규칙이 이미 범위를 정한다)
+    $('#btn-daily').addEventListener('click', () => {
+      this.requestFullscreen();
+      this.startDaily(this.subject);
+    });
   }
 
   applyBodyFlags() {
@@ -149,7 +163,70 @@ export class App {
       card.addEventListener('click', () => this.openScope(key));
       grid.append(card);
     }
+    this.renderJourney();
+    this.renderDaily();
     this.renderBoard();
+  }
+
+  // ── 여정 ────────────────────────────────────────────────
+  /**
+   * 🔴 «지금 고른 과목»의 여정만 보여 준다. 셋을 한꺼번에 늘어놓으면 그건 여정이 아니라 표가 된다.
+   * 🔴 잠긴 구간도 «이름을 보여 준다». 조사에서 빈 도감 실루엣이 자이가르닉 효과를 만든다고
+   *    갈렸다 — 뭐가 있는지 모르면 가고 싶지도 않다. 다만 조건은 정직하게 적는다.
+   */
+  renderJourney() {
+    const ul = $('#zone-list');
+    if (!ul) return;
+    ul.textContent = '';
+    $('#journey-subject').textContent = SUBJECTS[this.subject] ? SUBJECTS[this.subject].label : '';
+    const best = this.data.best[this.bestKey()] || 0;
+    const zones = journeyOf(best);
+    zones.forEach((z, i) => {
+      const li = el('li', 'zone' + (z.done ? ' done' : '') + (z.locked ? ' locked' : ''));
+      li.append(el('span', 'zone-icon', z.locked ? '🔒' : z.icon));
+      const box = el('span', 'zone-box');
+      box.append(el('b', 'zone-name', z.name));
+      const range = Number.isFinite(z.to) ? `${z.from}~${z.to}층` : `${z.from}층~`;
+      box.append(el('span', 'zone-range', range));
+      li.append(box);
+      const state = el('span', 'zone-state');
+      if (z.locked) {
+        state.textContent = `${zones[i - 1].name} 완주하면`;
+      } else if (z.done) {
+        state.textContent = '완주 ✓';
+      } else if (Number.isFinite(z.to)) {
+        state.textContent = `${Math.max(0, best - z.from + 1)} / ${z.span}`;
+      } else {
+        state.textContent = best >= z.from ? `${best}층` : '';
+      }
+      li.append(state);
+      ul.append(li);
+    });
+  }
+
+  // ── 오늘의 계단 ─────────────────────────────────────────
+  renderDaily() {
+    const plan = planForNow(this.subject);
+    const stars = todayStars(this.data.flags, plan);
+    $('#daily-day').textContent = plan.day.slice(5).replace('-', '월 ') + '일';
+    $('#daily-goal').textContent = `목표 ${plan.goal}층`;
+    $('#daily-rule').textContent = plan.rule ? plan.rule.label : '오늘은 특별한 규칙이 없어요';
+    $('#daily-stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+    const btn = $('#btn-daily');
+    // 🔴 이미 별 3개를 받았어도 «잠그지» 않는다. 더 하고 싶으면 더 할 수 있어야 한다 —
+    //    다만 문구로 «다 했다»를 알려 주어 종료점을 만든다(D40 과 같은 취지).
+    btn.textContent = stars >= 3 ? '오늘의 계단 다시 하기' : '오늘의 계단 도전';
+
+    const wv = weekView(this.data.week, Date.now());
+    const marks = $('#week-marks');
+    marks.textContent = '';
+    ['월', '화', '수', '목', '금', '토', '일'].forEach((d, i) => {
+      const li = el('li', 'week-mark' + (wv.marks[i] ? ' on' : ''));
+      li.textContent = d;
+      marks.append(li);
+    });
+    // 🔴 «남은 날»을 세지 않는다(D39). 찍은 칸만 말한다.
+    $('#week-count').textContent = wv.done ? `${wv.count}일 · 황금 계단 ✓` : `${wv.count}일`;
   }
 
   // ── 오늘의 등수 ─────────────────────────────────────────
@@ -280,9 +357,24 @@ export class App {
   }
 
   // ── 런 ──────────────────────────────────────────────────
-  startRun() {
+  /**
+   * 오늘의 계단으로 한 판.
+   * 🔴 시드를 «날짜에서» 받는다 — 그래서 서버 없이도 전국이 같은 판이 된다(D37).
+   *    일반 런의 seedFn(무작위)과 섞이지 않게 startRun 에 넘겨 준다.
+   */
+  startDaily(subject) {
+    this.subject = subject;
+    this.daily = planForNow(subject);
+    this.scope = this.daily.scope;      // 오늘의 규칙(구구단 단 제한). 영단어면 null.
+    this.startRun({ seed: this.daily.seed });
+  }
+
+  startRun(opts = {}) {
     this.endRun(true);
-    const seed = this.seedFn();
+    // 🔴 오늘의 계단이 아니면 daily 를 «반드시» 끈다. 안 끄면 다음 일반 런의 결과가
+    //    오늘의 깃발로 기록된다 — 상태가 새는 전형적인 자리다(smokeMode 와 같은 이유).
+    if (opts.seed === undefined) this.daily = null;
+    const seed = opts.seed !== undefined ? opts.seed : this.seedFn();
     // 스모크 상태가 일반 런으로 새면 봇이 대신 플레이한다 — 진입할 때마다 명시적으로 끈다.
     this.autoBot = null;
     this.smokeMode = false;
@@ -665,6 +757,20 @@ export class App {
     const missions = applyRun(this.data, {
       correct: c.stats.correct, bestStreak: c.bestStreak, reviewCorrect: c.stats.reviewCorrect,
     }, Date.now());
+
+    // ── 여기서부터 v4 축 ─────────────────────────────────────
+    const now = Date.now();
+    // 숙련도 — 이번 판에 «판정된» 문항만. 안 푼 문항은 세지 않는다.
+    this.data.mastery = applyPerId(this.data.mastery, this.subject, c.stats.perId);
+    // 이번 주 도장 — 연속이 아니라 누적(하루 빠져도 앞 도장이 남는다)
+    const stamp = stampToday(this.data.week, now);
+    this.data.week = stamp.week;
+    // 오늘의 계단이었다면 깃발
+    let dailyStars = 0;
+    if (this.daily) {
+      dailyStars = starsFor(this.daily, { floor: c.floor, accuracy: c.accuracy });
+      this.data.flags = recordFlag(this.data.flags, this.daily, dailyStars);
+    }
     this.persist();
 
     $('#result-title').textContent = isBest ? '🎉 새 기록!' : '기록';
@@ -672,9 +778,17 @@ export class App {
     $('#result-acc').textContent = `${Math.round(c.accuracy * 100)}%`;
     $('#result-coin').textContent = c.coins + (missions.gained || 0);
     $('#result-best').textContent = this.data.best[this.bestKey()];
+    // 🔴 왜 끝났는가. 「그냥 끝났다」와 「기력이 바닥났다」는 다음 판의 각오가 다르다.
+    //    causeText() 는 예전에 «정의만 되고 불리지 않아» 화면에 뜬 적이 없었다(2026-09-06 발견).
+    $('#result-cause').textContent = this.causeText();
+
+    // 🔴 «0층에서 0층 남았다»고 말하지 않는다. 아직 기록이 없는 아이에게 남은 거리를
+    //    들이밀면 그건 목표가 아니라 잔소리다 — 첫 판은 그냥 첫 판이라고 말한다.
     $('#result-gap').textContent = isBest
-      ? '최고 기록을 넘었어요!'
-      : `최고 기록까지 ${prevBest - c.floor}층 남았어요`;
+      ? (prevBest > 0 ? '최고 기록을 넘었어요!' : '첫 기록을 세웠어요!')
+      : (c.floor === 0 ? '한 층만 올라도 기록이 돼요' : `최고 기록까지 ${prevBest - c.floor}층 남았어요`);
+
+    this.renderGoals(c, dailyStars);
 
     // 오늘 판에 올린다. 실패해도 게임 흐름은 건드리지 않는다(있으면 좋은 것).
     // 🔴 «과목:모드» 로 보낸다 — 규칙이 다른 기록을 한 표에 줄 세우면 등수가 실력이 아니라
@@ -685,23 +799,76 @@ export class App {
 
     const miss = $('#result-miss');
     miss.textContent = '';
-    const first = c.stats.wrongIds[0];
-    if (first) {
-      const d = describeId(first);
-      if (d) {
-        miss.append(el('div', null, '이번에 놓친 문제'));
-        const b = el('div');
-        b.append(el('b', null, `${d.q} → ${d.a}`));
-        miss.append(b);
-        miss.append(el('div', null, '다음 판에서 다시 나와요. 이번엔 맞혀 봐요!'));
-      }
-    } else if (c.stats.asked > 0) {
+    // 🔴 놓친 문제를 «전부» 보여 준다. 예전에는 첫 1개만 쓰고 나머지를 버렸다 —
+    //    세 개를 틀렸는데 하나만 알려 주면 나머지 둘은 아이가 틀린 줄도 모른 채 지나간다.
+    const wrong = [...new Set(c.stats.wrongIds || [])].map(describeId).filter(Boolean);
+    if (wrong.length) {
+      miss.append(el('div', null, `이번에 놓친 문제 ${wrong.length}개`));
+      const b = el('div', 'miss-items');
+      wrong.slice(0, 6).forEach((d) => b.append(el('b', null, `${d.q} → ${d.a}`)));
+      miss.append(b);
+      if (wrong.length > 6) miss.append(el('div', 'hint', `그리고 ${wrong.length - 6}개 더`));
+      miss.append(el('div', null, '다음 판에서 다시 나와요. 이번엔 맞혀 봐요!'));
+    // 🔴 «틀린 게 없다»와 «맞힌 게 있다»는 다르다. 한 문제도 못 맞히고 기력이 바닥난 판에
+    //    「틀린 문제가 하나도 없었어요. 대단해요!」라고 칭찬하던 결함이 있었다(2026-09-06 발견).
+    //    답하지 못한 문항은 오답으로 세지 않으므로(game.js:254) wrongIds 가 비는데,
+    //    그걸 «완벽»으로 읽으면 아이는 자기가 뭘 잘했는지 모른 채 거짓 칭찬을 받는다.
+    } else if (c.stats.correct > 0) {
       miss.append(el('div', null, '틀린 문제가 하나도 없었어요. 대단해요!'));
     }
     if (missions.gained) {
       miss.append(el('div', null, `오늘의 미션 달성으로 코인 +${missions.gained}`));
     }
     this.go('result');
+  }
+
+  /**
+   * 결과 화면의 «미완성 목표» 목록.
+   *
+   * 🔴 목표가 하나뿐이면 그것을 넘은 순간 갈 곳이 없어진다. 그래서 성격이 다른 것을 겹친다 —
+   *    ① 아케이드(최고 기록) ② 수집(구간·깃발) ③ 학습(숙련도). 조사에서 이 셋이 각각
+   *    Doodle Jump · Infinite Stairs · Khan Academy 의 축이었다(docs/RESEARCH-retention.md).
+   *
+   * 🔴 «압박»이 아니라 «남은 거리»만 말한다. 「안 하면 사라져요」류 문구를 쓰지 않는다(D39).
+   *    이미 이룬 것은 목표로 다시 내걸지 않는다 — 끝없는 사슬을 만들지 않기 위해서다.
+   */
+  renderGoals(core, dailyStars) {
+    const ul = $('#result-goals');
+    if (!ul) return;
+    ul.textContent = '';
+    const add = (icon, text) => {
+      const li = el('li', 'goal');
+      li.append(el('span', 'goal-icon', icon));
+      li.append(el('span', 'goal-text', text));
+      ul.append(li);
+    };
+
+    const best = this.data.best[this.bestKey()] || 0;
+
+    // ① 구간 — 지금 오르는 곳과 다음 구간까지
+    const gap = nextZoneGap(best);
+    if (gap && gap.gap > 0) {
+      add(gap.zone.icon, `${gap.zone.name} 완주까지 ${gap.gap}층`);
+    } else if (gap) {
+      add(gap.zone.icon, `${gap.zone.name} 완주!`);
+    }
+
+    // ② 숙련도 — 가장 약한 칸 하나만. 여덟 개를 늘어놓으면 못하는 곳의 목록이 된다.
+    const weak = weakest(this.data.mastery, this.subject);
+    if (weak) add('📊', `${weak.label} ${weak.pct}%`);
+
+    // ③ 오늘의 계단 — 했으면 별, 안 했으면 있다는 사실만
+    if (this.daily) {
+      add('📅', `오늘의 계단 ${'★'.repeat(dailyStars)}${'☆'.repeat(3 - dailyStars)}`);
+    } else {
+      const t = todayStars(this.data.flags, planForNow(this.subject));
+      if (!t) add('📅', '오늘의 계단이 기다려요');
+    }
+
+    // ④ 이번 주 도장 — 달성했으면 축하만, 아니면 «몇 칸 찍었는지»만 말한다(남은 날 압박 금지)
+    const wv = weekView(this.data.week, Date.now());
+    if (wv.done) add('🗓️', `이번 주 ${wv.count}일 — 황금 계단 열림`);
+    else add('🗓️', `이번 주 ${wv.count}일 놀았어요`);
   }
 
   // ── 오답노트 ────────────────────────────────────────────

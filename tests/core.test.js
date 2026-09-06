@@ -354,6 +354,33 @@ describe('세이브 [D12]', () => {
     expect(out.best).toEqual({ 'gugudan:classic': 40, 'words34:classic': 12 });
     expect(out.coins).toBe(7);
   });
+  it('v3 → v4: 새 칸이 «비어서» 열린다 — 하지 않은 날을 했다고 말하지 않는다', () => {
+    // 🔴 최고 기록이 높다고 지난 날짜에 깃발을 소급해 찍으면, 아이가 하지 않은 날을
+    //    했다고 기록하는 셈이다. 여정 진행도만은 최고 기록에서 그때그때 유도된다.
+    const v3 = { coins: 5, best: { 'gugudan:classic': 80 }, notes: {} };
+    const out = migrate(3, v3);
+    expect(out.best).toEqual({ 'gugudan:classic': 80 });
+    expect(out.flags).toEqual({});
+    expect(out.mastery).toEqual({});
+    expect(out.week).toEqual({ week: '', days: [], claimed: false });
+    expect(out.coins).toBe(5);
+  });
+  it('v1 → v4 전 구간을 한 번에 지난다', () => {
+    const out = migrate(1, { coins: 3, best: 12, notes: {} });
+    expect(out.best).toEqual({ 'gugudan:classic': 12 });
+    expect(out.flags).toEqual({});
+    expect(out.week.claimed).toBe(false);
+  });
+  it('🔴 새 칸도 신뢰 경계 밖이다 — 모양이 어긋나면 고치지 말고 버린다', () => {
+    const out = sanitize({
+      flags: { '2026-09-06|gugudan': 9, 'ㅁㄴㅇㄹ': 3, '2026-09-06|words34': 2 },
+      mastery: { 'gugudan:7': { c: 100, a: 10 }, 'DROP TABLE': { c: 1, a: 1 }, words34: { c: 3, a: 5 } },
+      week: { week: '2026-09-07', days: [0, 1, 99, 'x'], claimed: 'yes' },
+    });
+    expect(out.flags).toEqual({ '2026-09-06|words34': 2 });      // 별 9개·날짜 아님은 버림
+    expect(out.mastery).toEqual({ words34: { c: 3, a: 5 } });    // 맞힌 수 > 푼 수는 버림
+    expect(out.week).toEqual({ week: '2026-09-07', days: [0, 1], claimed: false });
+  });
   it('낯선 모드 문자열은 클래식으로 떨어진다(저장소는 신뢰 경계 밖)', () => {
     expect(sanitize({ mode: '../../etc' }).mode).toBe('classic');
     expect(sanitize({ mode: 'thrill' }).mode).toBe('thrill');

@@ -408,3 +408,51 @@ body.color-safe .choice.is-wrong .mark { display: inline; }
 }
 .how-steps em { font-style: normal; color: var(--accent); font-weight: 700; }
 .how-tip { margin: 6px 0 16px; font-size: 15px; color: var(--muted); }
+
+/* ── 여정 · 오늘의 계단 · 주간 도장 (2026-09-06) ──────────────────
+   🔴 기존 토큰만 쓴다(--panel/--line/--ink/--ink-dim/--accent/--accent-ink/--good/--tap).
+      새 색을 들이면 대비 4.5:1 을 다시 재야 하고 D16 이 매번 잡는다.
+   🔴 누를 수 있는 것은 전부 --tap 이상. 잠긴 구간은 «누를 수 없는 것»이라 최소 높이만 준다. */
+.journey, .daily-card {
+  margin: 18px 0 0; padding: 14px 16px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.zone-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.zone {
+  display: flex; align-items: center; gap: 10px; min-height: 48px;
+  padding: 10px 12px; border-radius: 12px; background: var(--panel-solid);
+}
+.zone.done { border: 1px solid var(--good); }
+.zone.locked { opacity: .6; }
+.zone-icon { font-size: 24px; width: 32px; text-align: center; flex: none; }
+.zone-box { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.zone-name { font-size: 17px; color: var(--ink); }
+.zone-range { font-size: 13px; color: var(--ink-dim); }
+.zone-state { font-size: 14px; color: var(--ink-dim); flex: none; text-align: right; }
+
+.daily-goal { font-size: 20px; font-weight: 700; color: var(--ink); margin: 8px 0 2px; }
+.daily-rule { font-size: 15px; color: var(--ink-dim); margin: 0 0 10px; }
+.daily-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.daily-stars { font-size: 22px; letter-spacing: 2px; flex: none; color: var(--ink); }
+.daily-btn { flex: 1 1 200px; min-height: var(--tap); }
+
+.week-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.week-label { font-size: 14px; color: var(--ink-dim); flex: none; }
+.week-marks { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; }
+.week-mark {
+  width: 32px; height: 32px; line-height: 32px; text-align: center;
+  border-radius: 50%; font-size: 13px; background: var(--panel-solid); color: var(--ink-dim);
+}
+.week-mark.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.week-count { font-size: 14px; color: var(--ink-dim); margin-left: auto; }
+
+/* 결과 화면 — «미완성 목표» 목록 */
+.result-cause { font-size: 15px; color: var(--ink-dim); margin: 6px 0 0; }
+.goal-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.goal {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 10px 12px; border-radius: 12px; background: var(--panel-solid);
+}
+.goal-icon { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.goal-text { font-size: 16px; color: var(--ink); }
+.miss-items { display: flex; flex-direction: column; gap: 2px; }

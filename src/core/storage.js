@@ -2,7 +2,11 @@
 // 🔴 개인정보는 저장하지 않는다. 저장하는 것: 코인·해금·최고기록·오답노트 박스·미션 진행뿐.
 // localStorage 접근은 전부 try/catch — 사생활 보호 모드·차단 설정에서 접근 자체가 throw 한다.
 
-import { SAVE, SHOP, SRS, MODES, DEFAULT_MODE } from './balance.js';
+import { SAVE, SHOP, SRS, MODES, DEFAULT_MODE, DAILY } from './balance.js';
+import { MASTERY_WINDOW } from './mastery.js';
+
+/** 숙련도 칸 키 모양 — mastery.bucketOf 가 만드는 것만 통과시킨다 */
+const MASTERY_KEY_RE = /^(gugudan:[2-9]|words34|words56)$/;
 
 const SRS_MAX_BOX = SRS.MAX_BOX;
 
@@ -20,6 +24,12 @@ export function emptySave() {
     settings: { sound: true, reducedMotion: false, colorSafe: false },
     mode: DEFAULT_MODE,   // 마지막으로 고른 모드
     seenHow: false,       // 놀이 방법 안내를 이미 봤는가
+    // ── v4 (2026-09-06) ──
+    // 🔴 여정 해금은 «저장하지 않는다». journey.js 가 최고 기록에서 매번 유도한다 —
+    //    저장하면 손으로 고쳐 넣어 건너뛸 수 있다(D38). 위조할 값을 만들지 않는 것이 방어다.
+    flags: {},            // 오늘의 계단 깃발 — 'YYYY-MM-DD|과목' -> 별(1~3)
+    week: { week: '', days: [], claimed: false },   // 이번 주 도장(누적·연속 아님)
+    mastery: {},          // 숙련도 — 'gugudan:7' | 'words34' -> {c, a}
   };
 }
 
@@ -41,6 +51,14 @@ const MIGRATIONS = {
     const best = {};
     for (const [k, v] of Object.entries(old)) best[k.includes(':') ? k : `${k}:classic`] = v;
     return { ...d, best, mode: MODES[d.mode] ? d.mode : DEFAULT_MODE };
+  },
+  /** v3 → v4: 여정·오늘의 계단·주간 도장·숙련도 칸을 «비워서» 연다.
+   *  🔴 옛 저장에서 이 값들을 «유추하지» 않는다. 최고 기록이 80층이라고 지난 날짜에
+   *     깃발을 소급해 찍으면, 아이가 하지 않은 날을 했다고 말하는 셈이다.
+   *     여정 진행도만은 최고 기록에서 그때그때 유도되므로 옮길 것이 없다(journey.js). */
+  3: (data) => {
+    const d = { ...emptySave(), ...(data && typeof data === 'object' ? data : {}) };
+    return { ...d, flags: {}, week: { week: '', days: [], claimed: false }, mastery: {} };
   },
 };
 
@@ -136,6 +154,44 @@ export function sanitize(data) {
     correct: intOrZero(t.correct, 10_000_000),
     asked: intOrZero(t.asked, 10_000_000),
   };
+
+  // ── v4 칸 ─────────────────────────────────────────────────────
+  // 🔴 여기도 신뢰 경계 밖이다. 모양이 어긋난 항목은 «고치지 말고 버린다» —
+  //    반쯤 고친 값이 들어오면 나중에 그게 진짜였는지 알 수 없게 된다(notes 와 같은 원칙).
+  const flags = plainObject(out.flags);
+  out.flags = {};
+  for (const [k, v] of Object.entries(flags)) {
+    const m = String(k).split('|');
+    if (m.length !== 2 || !DAY_RE.test(m[0])) continue;
+    const stars = Number(v);
+    if (!Number.isInteger(stars) || stars < 1 || stars > 3) continue;
+    out.flags[k] = stars;
+  }
+  // 상한을 넘겨 들어온 저장은 오래된 것부터 버린다(무한히 자라지 않게)
+  const fkeys = Object.keys(out.flags).sort();
+  while (fkeys.length > DAILY.FLAG_KEEP) delete out.flags[fkeys.shift()];
+
+  const w = plainObject(out.week);
+  const days = Array.isArray(w.days)
+    ? [...new Set(w.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b)
+    : [];
+  out.week = {
+    week: typeof w.week === 'string' && DAY_RE.test(w.week) ? w.week : '',
+    days: out.week && typeof w.week === 'string' && DAY_RE.test(w.week) ? days : [],
+    claimed: w.claimed === true,
+  };
+
+  const mast = plainObject(out.mastery);
+  out.mastery = {};
+  for (const [k, v] of Object.entries(mast)) {
+    if (!MASTERY_KEY_RE.test(String(k))) continue;
+    const r = plainObject(v);
+    const a = Number(r.a);
+    const c = Number(r.c);
+    if (!Number.isInteger(a) || a < 0 || a > MASTERY_WINDOW) continue;
+    if (!Number.isInteger(c) || c < 0 || c > a) continue;    // 맞힌 수가 푼 수보다 많을 수 없다
+    out.mastery[k] = { c, a };
+  }
   return out;
 }
 

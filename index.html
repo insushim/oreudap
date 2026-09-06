@@ -25,6 +25,36 @@
       <div class="coin-chip" id="title-coins" aria-live="polite"><span class="coin-ico">●</span><span id="title-coin-n">0</span></div>
     </header>
     <div class="subject-grid" id="subject-grid" role="list"></div>
+
+    <!-- 🗺️ 여정 — 「어디까지 왔나」. 해금은 코인이 아니라 도달 층이다(D38). -->
+    <section class="journey" aria-labelledby="journey-h">
+      <div class="board-head">
+        <h2 id="journey-h">나의 여정</h2>
+        <span class="board-day" id="journey-subject"></span>
+      </div>
+      <ul class="zone-list" id="zone-list"></ul>
+    </section>
+
+    <!-- 📅 오늘의 계단 — 날짜가 시드다. 서버도 계정도 쓰지 않는다(D37). -->
+    <section class="daily-card" aria-labelledby="daily-h">
+      <div class="board-head">
+        <h2 id="daily-h">오늘의 계단</h2>
+        <span class="board-day" id="daily-day"></span>
+      </div>
+      <p class="daily-goal" id="daily-goal"></p>
+      <p class="daily-rule" id="daily-rule"></p>
+      <div class="daily-row">
+        <span class="daily-stars" id="daily-stars" aria-live="polite"></span>
+        <button class="primary-btn daily-btn" id="btn-daily" type="button">오늘의 계단 도전</button>
+      </div>
+      <!-- 🔴 D39: 「안 하면 사라져요」류 문구를 두지 않는다. 지난 날은 그냥 비어 있을 뿐이다. -->
+      <div class="week-row">
+        <span class="week-label">이번 주</span>
+        <ul class="week-marks" id="week-marks" aria-label="이번 주 논 날"></ul>
+        <span class="week-count" id="week-count"></span>
+      </div>
+    </section>
+
     <nav class="title-nav">
       <button class="nav-btn" data-go="notes" type="button">오답노트</button>
       <button class="nav-btn" data-go="collection" type="button">컬렉션</button>
@@ -95,11 +125,17 @@
       <div><b id="result-coin">0</b><span>모은 코인</span></div>
       <div><b id="result-best">0</b><span>최고 기록</span></div>
     </div>
+    <div class="result-cause" id="result-cause"></div>
     <div class="result-gap" id="result-gap"></div>
+    <!-- 🔴 «미완성 목표»를 셋 보여 준다. 하나뿐이면 그것을 넘은 순간 갈 곳이 없어진다.
+         근거 = docs/RESEARCH-retention.md (Doodle Jump 개인기록 + Khan 숙련도 + 수집 진행도) -->
+    <ul class="goal-list" id="result-goals"></ul>
     <div class="miss-card" id="result-miss"></div>
     <div class="result-actions">
-      <button class="primary-btn" id="btn-again" type="button">한 판 더</button>
-      <button class="ghost-btn" data-go="title" type="button">그만하기</button>
+      <button class="primary-btn" id="btn-again" type="button">바로 다시!</button>
+      <!-- 🔴 D40: 그만두는 길을 게임이 «먼저» 제시한다. 조사가 지목한 다크패턴 중 하나가
+           「자연스러운 종료점을 없애는 것」이라, 이 버튼은 눈에 띄어야 하고 44px 이상이어야 한다. -->
+      <button class="ghost-btn" id="btn-enough" data-go="title" type="button">오늘 할 만큼 했어요</button>
     </div>
   </section>
 
