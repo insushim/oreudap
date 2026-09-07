@@ -8,7 +8,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { GameCore, PHASE } from '../src/core/game.js';
 import { PersistentNotes } from '../src/core/srs.js';
 
-const SUBJECTS = ['gugudan', 'words34', 'words56'];
+const SUBJECTS = ['gugudan', 'words34', 'words56', 'korean34', 'korean56'];
 const PER_CELL = 600;        // 과목×갈래수 셀당 표본
 const OUT = 'qa/answer-sample.json';
 

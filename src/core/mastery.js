@@ -13,6 +13,8 @@
 
 import { WEEKLY } from './balance.js';
 
+import { isWordSubject, SUBJECTS } from './questions.js';
+
 /** 한 칸의 최대 표본. 넘으면 오래된 만큼을 비례로 줄인다(최근 실력이 보이게). */
 export const MASTERY_WINDOW = 60;
 
@@ -29,7 +31,10 @@ export function bucketOf(subject, id) {
     const m = s.match(/^g:(\d+)x\d+$/);
     return m ? `gugudan:${m[1]}` : null;
   }
-  if (subject === 'words34' || subject === 'words56') {
+  // 🔴 낱말 과목 목록을 여기 다시 적지 않는다 — questions.POOLS 가 정본이다.
+  //    적어 두면 과목이 늘 때 이 줄을 빠뜨려 숙련도만 조용히 안 쌓인다(화면엔 「아직」으로 보여
+  //    고장인지 표본 부족인지 구분이 안 간다 — 가장 늦게 발견되는 종류의 결함).
+  if (isWordSubject(subject)) {
     return s.startsWith(`w:${subject}:`) ? subject : null;
   }
   return null;
@@ -92,7 +97,7 @@ export function masteryList(mastery, subject) {
       key: `gugudan:${d}`, label: `${d}단`, pct: percentOf(mastery, `gugudan:${d}`),
     }));
   }
-  const label = subject === 'words34' ? '영단어 3·4학년' : '영단어 5·6학년';
+  const label = (SUBJECTS[subject] && SUBJECTS[subject].label) || subject;
   return [{ key: subject, label, pct: percentOf(mastery, subject) }];
 }
 

@@ -8,7 +8,9 @@ import path from 'node:path';
 import { WORDS_G34 } from '../src/data/words-g34.js';
 import { WORDS_G56 } from '../src/data/words-g56.js';
 import { COMMON_ERRORS } from '../src/data/gugudan-common-errors.js';
-import { MIN_WORDS_PER_BAND } from '../src/core/balance.js';
+import { KOREAN_G34 } from '../src/data/korean-g34.js';
+import { KOREAN_G56 } from '../src/data/korean-g56.js';
+import { MIN_WORDS_PER_BAND, MIN_KOREAN_PER_BAND } from '../src/core/balance.js';
 import { buildBank } from '../src/core/questions.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -86,13 +88,50 @@ const POS = new Set(['n', 'v', 'a', 'num']);
   }
 }
 
+// ── ③-2 국어 어휘: 화면에 들어가는가 · 답이 보이지 않는가 ──
+//
+// 🔴 영단어와 «다른 것»만 잰다. 뜻이 한국어 한 줄이라 새로 생기는 실패 방식이 셋 있다:
+//    ⓐ 뜻풀이가 길어 계단 칸을 넘친다 ⓑ 뜻 안에 낱말이 들어가 답이 보인다
+//    ⓒ 두 뜻이 서로를 포함해 정답이 둘이 된다. 셋 다 «데이터»의 결함이지 코드의 결함이 아니라
+//    화면을 아무리 봐도 그 문항이 나오기 전엔 모른다 — 그래서 기계가 전수로 본다.
+const KO_BANDS = [['korean-g34', KOREAN_G34], ['korean-g56', KOREAN_G56]];
+const KO_POS = new Set(['n', 'v', 'a', 'ad']);
+const K_MAX = 8;   // 뜻풀이 최대 글자수 — 3갈래 칸에서 18px 두 줄에 들어가는 한계(D43 실측)
+{
+  const allW = new Set();
+  const allK = [];
+  for (const [name, pool] of KO_BANDS) {
+    if (pool.length < MIN_KOREAN_PER_BAND) FAIL(`${name}: ${pool.length}개 — ${MIN_KOREAN_PER_BAND}개 미만이면 한 판 안에 반복된다`);
+    const byPos = {};
+    for (const e of pool) {
+      if (!e.w || !/^[가-힣]{2,5}$/.test(e.w)) FAIL(`${name}: 낱말 표기 오류 "${e.w}"`);
+      if (!e.k || !e.k.trim()) FAIL(`${name}: 뜻이 비었다 "${e.w}"`);
+      if (e.k && e.k.length > K_MAX) FAIL(`${name}: 뜻이 ${e.k.length}자 — ${K_MAX}자를 넘으면 계단 칸을 넘친다 "${e.w}" → "${e.k}"`);
+      if (!KO_POS.has(e.pos)) FAIL(`${name}: 품사 값 오류 "${e.w}" → "${e.pos}"`);
+      if (!Number.isInteger(e.t) || e.t < 1 || e.t > 3) FAIL(`${name}: 난이도 값 오류 "${e.w}" → ${e.t}`);
+      if (e.k && e.k.length >= 6 && !e.k.includes(' ')) FAIL(`${name}: 뜻을 붙여 썼다 "${e.w}" → "${e.k}" — 아이가 못 읽고, keep-all 이 줄바꿀 자리가 없어 낱말 안에서 잘린다`);
+      if (e.k && e.w && e.k.includes(e.w.slice(0, 2))) FAIL(`${name}: 뜻에 낱말이 그대로 들어 있다 "${e.w}" → "${e.k}" (답이 보인다)`);
+      if (allW.has(e.w)) FAIL(`밴드 간 중복 낱말 "${e.w}"`);
+      allW.add(e.w);
+      const clash = allK.find((o) => o.k.includes(e.k) || e.k.includes(o.k));
+      if (clash) FAIL(`뜻이 겹친다: "${e.w}" → "${e.k}" 와 "${clash.w}" → "${clash.k}" (한 문제의 두 보기가 되면 정답이 둘)`);
+      allK.push({ w: e.w, k: e.k });
+      byPos[e.pos] = (byPos[e.pos] || 0) + 1;
+    }
+    for (const [pp, c] of Object.entries(byPos)) {
+      if (c < 3) FAIL(`${name}: 품사 ${pp} 가 ${c}개뿐 — 같은 품사 오답 2개를 못 만든다`);
+    }
+    NOTE(`${name}: ${pool.length}개 · 품사 ${Object.entries(byPos).map(([pp, c]) => `${pp}:${c}`).join(' ')}`);
+  }
+}
+
 // ── ④ 출처 원장이 실재하고 데이터와 수가 맞는가 ────────────
 {
   if (!fs.existsSync(LEDGER)) {
     FAIL('docs/data-sources.md 가 없다 — 출처를 적지 않은 학습 데이터는 릴리스할 수 없다');
   } else {
     const text = fs.readFileSync(LEDGER, 'utf8');
-    for (const [name, pool] of BANDS) {
+    for (const [name, pool] of [...BANDS, ...KO_BANDS]) {
       const m = text.match(new RegExp(`${name}[^\\n]*?(\\d+)\\s*개`));
       if (!m) FAIL(`data-sources.md 에 ${name} 의 개수 선언이 없다`);
       else if (Number(m[1]) !== pool.length) FAIL(`data-sources.md 의 ${name} 개수 ${m[1]} ≠ 실제 ${pool.length}`);

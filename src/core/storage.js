@@ -6,7 +6,7 @@ import { SAVE, SHOP, SRS, MODES, DEFAULT_MODE, DAILY } from './balance.js';
 import { MASTERY_WINDOW } from './mastery.js';
 
 /** 숙련도 칸 키 모양 — mastery.bucketOf 가 만드는 것만 통과시킨다 */
-const MASTERY_KEY_RE = /^(gugudan:[2-9]|words34|words56)$/;
+const MASTERY_KEY_RE = /^(gugudan:[2-9]|words34|words56|korean34|korean56)$/;
 
 const SRS_MAX_BOX = SRS.MAX_BOX;
 

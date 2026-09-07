@@ -6,14 +6,13 @@ import { PersistentNotes } from './core/srs.js';
 import { SUBJECTS, describeId } from './core/questions.js';
 import { load, save, emptySave } from './core/storage.js';
 import { applyRun, buy, equip, todayMissions } from './core/economy.js';
-import { SHOP, HEART, SRS, TIMING, MODES, DEFAULT_MODE, STAMINA, TIER_FLOORS, tierIndexFor, tierStartFor } from './core/balance.js';
+import { SHOP, HEART, SRS, TIMING, MODES, DEFAULT_MODE, STAMINA, TIER_FLOORS, CHOICE_FIT, tierIndexFor, tierStartFor } from './core/balance.js';
 import { computeLayout, columns } from './ui/layout.js';
 import { Sound } from './ui/sound.js';
 import { Say } from './ui/say.js';
 import { SAY_WORDS } from './data/say-index.js';
 import { makeRng } from './core/rng.js';
-import { WORDS_G34 } from './data/words-g34.js';
-import { WORDS_G56 } from './data/words-g56.js';
+import { poolOf } from './core/questions.js';
 import { getNick, setNick, suggestNick, displayNick, fetchBoard, submitScore, todayKey } from './core/rankClient.js';
 import { journeyOf, currentZone, nextZoneGap } from './core/journey.js';
 import { planForNow, starsFor, recordFlag, todayStars, flagSummary } from './core/daily.js';
@@ -27,10 +26,27 @@ const el = (tag, cls, text) => {
   return n;
 };
 
+/**
+ * 보기 하나가 MAX_LINES 줄에 들어가는 글자 크기(px).
+ * 한글은 전각이라 한 글자가 거의 1em 을 먹고, 라틴은 그 절반쯤이다 — 같은 «글자수»라도 폭이 다르다.
+ * 🔴 하한(18px)에 걸리면 그건 «데이터가 너무 길다»는 신호다. 여기서 더 줄이지 않고
+ *    D43 게이트가 줄 수로 잡아 준다 — 화면 코드가 데이터 문제를 감춰 버리면 안 된다.
+ */
+function fitFontPx(longest, colW, choices) {
+  const hangul = choices.some((t) => /[가-힣]/.test(String(t)));
+  const em = hangul ? 1.0 : 0.58;            // 글자 하나가 먹는 폭(글꼴 실측 근사)
+  const usable = Math.max(40, colW - 24);    // 좌우 패딩 10 + 테두리 2씩
+  const perLine = Math.max(1, Math.ceil(longest / CHOICE_FIT.MAX_LINES));
+  const px = Math.floor(usable / (perLine * em));
+  return Math.max(CHOICE_FIT.MIN_PX, Math.min(CHOICE_FIT.MAX_PX, px));
+}
+
 const SUBJECT_META = {
   gugudan: { emoji: '✖️', desc: '2단부터 9단까지, 한눈에 즉답' },
-  words34: { emoji: '🅰️', desc: () => `3·4학년 기본 낱말 ${WORDS_G34.length}개` },
-  words56: { emoji: '📘', desc: () => `5·6학년 기본 낱말 ${WORDS_G56.length}개` },
+  words34: { emoji: '🅰️', desc: () => `3·4학년 기본 낱말 ${poolOf('words34').length}개` },
+  words56: { emoji: '📘', desc: () => `5·6학년 기본 낱말 ${poolOf('words56').length}개` },
+  korean34: { emoji: '📖', desc: () => `3·4학년 국어 낱말 ${poolOf('korean34').length}개` },
+  korean56: { emoji: '✒️', desc: () => `5·6학년 국어 낱말 ${poolOf('korean56').length}개` },
 };
 
 /** 등수판 한 줄의 «과목:모드» 를 사람 말로 — 옛 형식(모드 없음)은 클래식으로 읽는다 */
@@ -119,7 +135,7 @@ export class App {
     //    선택지가 아니라 «문제»를 누르는 것이라 오답 위험이 없다.
     $('#qcard').addEventListener('click', () => {
       const q = this.core && this.core.question;
-      if (q && q.word && (q.dir === 'w2k' || this.core.answered)) this.voice.speak(q.word);
+      if (q && q.word && (q.dir === 'w2k' || this.core.answered)) this.voice.speak(q.word, q.lang);
     });
     $('#scope-start').addEventListener('click', () => { this.requestFullscreen(); this.startRun(); });
     // 오늘의 계단 — 범위 선택을 건너뛴다(오늘의 규칙이 이미 범위를 정한다)
@@ -350,8 +366,11 @@ export class App {
       body.append(grid);
       body.append(el('p', 'scope-note', '고르지 않으면 2단부터 9단까지 전부 나와요. 여러 단을 같이 골라도 돼요.'));
     } else {
-      body.append(el('p', 'scope-note',
-        `낱말 ${(subject === 'words34' ? WORDS_G34 : WORDS_G56).length}개를 «영어 → 뜻»과 «뜻 → 영어» 두 방향으로 물어봐요. 틀린 낱말은 오답노트에 담겨 며칠 뒤 다시 나와요.`));
+      const n = poolOf(subject).length;
+      const ko = subject.startsWith('korean');
+      body.append(el('p', 'scope-note', ko
+        ? `낱말 ${n}개를 «낱말 → 뜻»과 «뜻 → 낱말» 두 방향으로 물어봐요. 틀린 낱말은 오답노트에 담겨 며칠 뒤 다시 나와요.`
+        : `낱말 ${n}개를 «영어 → 뜻»과 «뜻 → 영어» 두 방향으로 물어봐요. 틀린 낱말은 오답노트에 담겨 며칠 뒤 다시 나와요.`));
     }
     this.go('scope');
   }
@@ -514,8 +533,8 @@ export class App {
     // 🔴 영어→뜻 문제는 낱말을 «보여 주면서» 읽어 준다. 뜻→영어 문제에서 미리 읽으면
     //    정답을 그대로 알려 주는 것이라, 그쪽은 푼 뒤에 읽는다(onResolve).
     if (q.word) {
-      if (q.dir === 'w2k') this.voice.speak(q.word);
-      else this.voice.prefetch(q.word);   // 답을 낼 때 끊기지 않게 미리 받아만 둔다
+      if (q.dir === 'w2k') this.voice.speak(q.word, q.lang);
+      else if (q.lang !== 'ko') this.voice.prefetch(q.word);   // 답을 낼 때 끊기지 않게 미리 받아만 둔다
     }
     if (this.scene) this.scene.showRow(q.choices.length);
     this.updateHud();
@@ -526,7 +545,7 @@ export class App {
     const fb = $('#feedback');
     if (res.type === 'correct') {
       this.sound.play('correct');
-      if (q.word && q.dir === 'k2w') this.voice.speak(q.word);
+      if (q.word && q.dir === 'k2w') this.voice.speak(q.word, q.lang);
       // 계단이 오를수록 음악이 조여든다 — 층 경계는 코어(balance)가 정하고 UI 는 받아 쓴다.
       this.sound.setIntensity(res.floor, tierIndexFor(res.floor), tierStartFor(res.floor));
       if (this.scene) this.scene.jumpTo(q.answerIndex, res.floor);
@@ -548,7 +567,7 @@ export class App {
       if (res.chose != null) this.markChoice(res.chose, 'is-wrong');
       this.markChoice(q.answerIndex, 'is-correct');
       this.say(fb, res.type === 'timeout' ? `시간 초과! 정답은 ${res.answerText}` : `정답은 ${res.answerText}`, 'bad');
-      if (q.word && q.dir === 'k2w') this.voice.speak(q.word);
+      if (q.word && q.dir === 'k2w') this.voice.speak(q.word, q.lang);
     }
     this.updateHud();
   }
@@ -580,7 +599,11 @@ export class App {
     const box = $('#choices');
     const cols = columns(this.layout, q.choices.length);
     const longest = Math.max(...q.choices.map((t) => String(t).length));
-    const sizeClass = longest >= 7 ? 'len-l' : longest >= 4 ? 'len-m' : '';
+    const sizeClass = longest >= 10 ? 'len-xl' : longest >= 7 ? 'len-l' : longest >= 4 ? 'len-m' : '';
+    // 🔴 긴 보기는 «칸 폭»에서 글자 크기를 계산한다. 글자수만 보는 사다리는 2갈래와 3갈래의
+    //    칸 폭 차이(163px vs 105px)를 모르고, 그래서 3갈래에서 조용히 세 줄이 됐다(실측).
+    //    짧은 보기(구구단 숫자·영단어 뜻 대부분)는 지금 크기가 이미 맞아서 건드리지 않는다.
+    const fitPx = longest >= CHOICE_FIT.FROM_LEN ? fitFontPx(longest, cols[0].w, q.choices) : 0;
     q.choices.forEach((text, i) => {
       // 🔴 뜻 길이에 따라 글자 등급을 준다 — 자르지 않고 «작게 해서 넣는다».
       //    문항 폭은 «가장 긴 선택지»가 정한다: 하나만 길어도 셋 다 같은 등급을 써야
@@ -590,7 +613,9 @@ export class App {
       b.dataset.index = String(i);
       b.setAttribute('aria-label', `${i + 1}번 선택지 ${text}`);
       b.append(el('span', 'mark', ''));
-      b.append(el('span', 'txt', text));
+      const txt = el('span', 'txt', text);
+      if (fitPx) txt.style.fontSize = `${fitPx}px`;
+      b.append(txt);
       const c = cols[i];
       b.style.left = `${c.x}px`;
       b.style.top = `${c.y}px`;

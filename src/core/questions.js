@@ -3,6 +3,8 @@
 
 import { WORDS_G34 } from '../data/words-g34.js';
 import { WORDS_G56 } from '../data/words-g56.js';
+import { KOREAN_G34 } from '../data/korean-g34.js';
+import { KOREAN_G56 } from '../data/korean-g56.js';
 import { gugudanDistractors, wordDistractors } from './distractors.js';
 import { PositionDeck } from './positionDeck.js';
 import { SRS, tierIndexFor } from './balance.js';
@@ -12,7 +14,37 @@ export const SUBJECTS = {
   gugudan: { id: 'gugudan', label: '구구단', hint: '몇일까요?' },
   words34: { id: 'words34', label: '영단어 3·4학년', hint: '무슨 뜻일까요?' },
   words56: { id: 'words56', label: '영단어 5·6학년', hint: '무슨 뜻일까요?' },
+  korean34: { id: 'korean34', label: '국어 어휘 3·4학년', hint: '무슨 뜻일까요?' },
+  korean56: { id: 'korean56', label: '국어 어휘 5·6학년', hint: '무슨 뜻일까요?' },
 };
+
+/**
+ * 과목 → 낱말 풀. 🔴 **이 표가 유일한 정본이다.**
+ * 전에는 `subject === 'words34' ? A : B` 삼항식이 다섯 곳에 흩어져 있었다 —
+ * 과목을 하나 늘리면 다섯 곳을 «전부» 기억해서 고쳐야 하고, 한 곳을 빠뜨리면
+ * 새 과목이 조용히 3·4학년 영단어 풀을 쓰게 된다(고장이 아니라 «오답»으로 나타나서 더 나쁘다).
+ */
+const POOLS = {
+  words34: WORDS_G34,
+  words56: WORDS_G56,
+  korean34: KOREAN_G34,
+  korean56: KOREAN_G56,
+};
+
+/** 그 과목의 낱말 풀(구구단은 풀이 없다 → null) */
+export function poolOf(subject) {
+  return POOLS[subject] || null;
+}
+
+/** 낱말 과목인가 — 「구구단이 아니다」로 판정하지 않는다(과목이 늘면 그 판정이 틀린다) */
+export function isWordSubject(subject) {
+  return Object.prototype.hasOwnProperty.call(POOLS, subject);
+}
+
+/** 한국어를 읽어 주어야 하는 과목인가 — TTS 언어를 고르는 곳 */
+export function speechLangOf(subject) {
+  return subject === 'korean34' || subject === 'korean56' ? 'ko' : 'en';
+}
 
 /**
  * 문항 난이도 등급 1~3.
@@ -32,8 +64,11 @@ export function tierOf(item) {
     if (a >= 7 && b >= 6) return 3;
     return 2;
   }
-  const len = item.entry.w.length;
-  const base = len <= 4 ? 1 : len <= 6 ? 2 : 3;
+  // 🔴 국어 어휘는 «철자 길이»로 난이도를 못 잰다 — 「밉다」는 짧지만 뜻이 어렵고
+  //    「도서관」은 길지만 쉽다. 그래서 데이터가 난이도를 들고 오고(t), 여기서는 방향만 얹는다.
+  const base = item.entry.t != null
+    ? Math.min(3, Math.max(1, Number(item.entry.t)))
+    : (item.entry.w.length <= 4 ? 1 : item.entry.w.length <= 6 ? 2 : 3);
   return item.dir === 'k2w' ? Math.min(3, base + 1) : base;
 }
 
@@ -55,7 +90,7 @@ export function buildBank(subject, scope) {
     }
     return items;
   }
-  const pool = subject === 'words34' ? WORDS_G34 : WORDS_G56;
+  const pool = poolOf(subject);
   const items = [];
   for (const e of pool) {
     for (const dir of ['w2k', 'k2w']) {
@@ -82,7 +117,7 @@ export class QuestionSource {
     this.rng = rng;
     this.items = buildBank(subject, scope);
     this.byId = new Map(this.items.map((it) => [it.id, it]));
-    this.pool = subject === 'gugudan' ? null : (subject === 'words34' ? WORDS_G34 : WORDS_G56);
+    this.pool = poolOf(subject);
     this.sessionQueue = sessionQueue;
     this.notes = notes;
     this.now = now;
@@ -170,16 +205,18 @@ export class QuestionSource {
     for (let i = 0; i < branches; i++) {
       choices.push(i === answerIndex ? item.entry[field] : wrong[wi++][field]);
     }
+    const ko = speechLangOf(this.subject) === 'ko';
     return {
       subject: this.subject,
       prompt: dir === 'w2k' ? item.entry.w : item.entry.k,
-      promptSub: dir === 'w2k' ? '뜻은?' : '영어로?',
+      promptSub: dir === 'w2k' ? '뜻은?' : (ko ? '어떤 낱말?' : '영어로?'),
       choices,
       answerIndex,
       answerText: item.entry[field],
       // 🔴 UI 가 «영어 낱말»을 프롬프트에서 되짚지 않게 여기서 준다 — 방향이 k2w 면 프롬프트는
       //    한국어라, 화면 글자로는 무엇을 읽어 줄지 알 수 없다.
       word: item.entry.w,
+      lang: speechLangOf(this.subject),
       dir,
     };
   }
@@ -202,7 +239,8 @@ export function describeId(id) {
     return { q: `${a} × ${b}`, a: String(a * b) };
   }
   const [, band, w, dir] = id.split(':');
-  const pool = band === 'words34' ? WORDS_G34 : WORDS_G56;
+  const pool = poolOf(band);
+  if (!pool) return null;
   const e = pool.find((x) => x.w === w);
   if (!e) return null;
   return dir === 'w2k' ? { q: e.w, a: e.k } : { q: e.k, a: e.w };

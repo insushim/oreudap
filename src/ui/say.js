@@ -37,12 +37,18 @@ export class Say {
     } catch (e) { this.failed.push(`prefetch ${k}: ${e && e.message}`); }
   }
 
-  /** @returns {'file'|'tts'|'off'|'fail'} 어느 경로로 읽었는가 */
-  speak(word) {
+  /**
+   * @param {string} word 읽을 말
+   * @param {'en'|'ko'} [lang] 어느 말로 읽는가. 🔴 기본이 영어인 이유는 파일 943개가 전부 영어라서다 —
+   *        국어 어휘는 파일이 없으므로 «파일 경로 자체를 타면 안 된다». 소문자화한 한글 낱말이
+   *        우연히 영어 파일 이름과 겹칠 일은 없지만, 겹치지 않는다는 것에 기대는 대신 길을 나눈다.
+   * @returns {'file'|'tts'|'off'|'fail'} 어느 경로로 읽었는가
+   */
+  speak(word, lang = 'en') {
     if (!this.enabledFn() || !word) return 'off';
     const k = String(word).toLowerCase();
     this.stop();
-    if (this.has(k)) {
+    if (lang === 'en' && this.has(k)) {
       try {
         let a = this.cache.get(k);
         if (!a) { a = new Audio(`${DIR}/${k}.m4a`); this.cache.set(k, a); }
@@ -59,11 +65,11 @@ export class Say {
       const synth = window.speechSynthesis;
       if (!synth) return 'fail';
       const u = new SpeechSynthesisUtterance(word);
-      u.lang = 'en-US';
+      u.lang = lang === 'ko' ? 'ko-KR' : 'en-US';
       u.rate = 0.85;          // 아이가 따라 할 수 있는 속도
       synth.cancel();
       synth.speak(u);
-      this.lastSpoken = { word: k, via: 'tts' };
+      this.lastSpoken = { word: k, via: 'tts', lang };
       return 'tts';
     } catch (e) {
       this.failed.push(`tts ${k}: ${e && e.message}`);

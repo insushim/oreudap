@@ -69,7 +69,11 @@ html, body {
 .coin-chip.big { font-size: 20px; margin: 4px 0 10px; }
 .coin-ico { color: var(--accent); }
 
-.subject-grid { width: 100%; max-width: 560px; display: grid; gap: 12px; margin: 22px 0 16px; }
+/* 🔴 과목이 다섯이 되면서 한 줄씩 쌓으면 타이틀이 세로로 길어진다. auto-fit 이라
+   360px 폰에서는 지금까지처럼 한 칸, 자리가 나면 두 칸으로 접힌다 — 좁은 화면에서
+   두 칸으로 찌그러지는 일이 없도록 최소 폭을 260px 로 잡았다(카드가 가로 배치라 그 아래로는 글자가 겹친다). */
+.subject-grid { width: 100%; max-width: 560px; display: grid; gap: 12px; margin: 22px 0 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .subject-card {
   display: flex; align-items: center; gap: 14px;
   width: 100%; min-height: 92px; padding: 16px 18px;
@@ -188,6 +192,10 @@ h3 { font-size: 17px; margin: 20px 0 8px; align-self: flex-start; width: 100%; m
 /* 뜻이 길수록 글자를 낮춘다 — 게이트 하한 28px 는 넘지 않는다(읽을 수 있어야 한다). */
 .choice.len-m .txt { font-size: clamp(28px, 5.6vw, 33px); padding: 9px 13px; }
 .choice.len-l .txt { font-size: 28px; padding: 8px 10px; line-height: 1.08; }
+/* 🔴 국어 어휘 뜻풀이는 최장 12자다 — 영단어 뜻(최장 9자)보다 길어서 len-l(28px)로는
+   360px 화면에서 두 줄이 되고, 발판 위 절대배치라 두 줄이 되면 아래 칸과 겹친다.
+   길이 상한은 tools/check-data.mjs 의 K_MAX 가 정본이고, 이 등급이 그 상한을 받아 낸다. */
+.choice.len-xl .txt { font-size: 22px; padding: 7px 10px; line-height: 1.1; }
 .choice:active { transform: scale(0.96); }
 .choice:focus-visible { outline: none; }
 .choice:focus-visible .txt { outline: 3px solid var(--accent); outline-offset: 3px; }

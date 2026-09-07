@@ -6,6 +6,7 @@
   "description": "오르답 — 정답을 밟고 오르는 무한 학습 계단",
   "scripts": {
     "words:import": "node tools/import-words.mjs",
+    "korean:import": "node tools/import-korean.mjs --src",
     "dev": "vite --port 5199 --strictPort",
     "build": "vite build",
     "preview": "vite preview --port 5198 --strictPort",
@@ -16,6 +17,7 @@
     "gate:all": "npm run gate",
     "gate": "bash tools/gate-all.sh",
     "gate:visual": "node tools/qa-visual.mjs --dir dist",
+    "gate:fit": "node tools/qa-choice-fit.mjs --dir dist",
     "gate:play": "node tools/qa-play.mjs --dir dist",
     "gate:perf": "node tools/qa-perf.mjs --dir dist",
     "gate:smoke": "node $HOME/.claude/skills/game-builder/tools/phaser-smoke.mjs --dir dist --page index.html --port 8181 --steps 600 --scene-cycles 5",
