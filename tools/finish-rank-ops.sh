@@ -2,7 +2,7 @@
 # 오르답 — 클라우드플레어 계정(gmail)이 있어야만 되는 두 가지.
 #   ① 등수 워커 배포(봇 기록을 아이들 판에서 빼는 수정)
 #   ② 오늘 판에 이미 쌓인 봇 기록 청소
-# 🔴 반드시 215253422+iw-lab@users.noreply.github.com 계정이어야 한다. naver 계정으로는 워커가 안 보인다.
+# 🔴 반드시 simssijjang@gmail.com 계정이어야 한다. naver 계정으로는 워커가 안 보인다.
 set -e
 cd ~/Documents/dev/muhan/worker
 NS=ce59a7c2c03b486299408a0a67a13d5c
